@@ -34,6 +34,10 @@ def setup_handlers(config):
         if not transactions:
             await update.message.reply_text("No unreviewed transactions found.")
             return
+        
+    async def trigger_plaid_refresh(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        lunch.trigger_fetch_from_plaid()
+        await update.message.reply_text("Plaid refresh triggered.")
 
     async def check_transactions_auto(context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info("Polling for new transactions...")
@@ -90,6 +94,7 @@ def setup_handlers(config):
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("check_transactions", check_transactions_manual))
+    application.add_handler(CommandHandler("refresh", trigger_plaid_refresh))
     application.add_handler(CallbackQueryHandler(button_callback))
 
     job_queue = application.job_queue
@@ -125,8 +130,7 @@ def main():
 if __name__ == "__main__":
     main()
 
-# TODO add menu to manually check transactions
+# TODO 
 #      figure out persistent storage and multiplexing
-#      add button to trigger plaid transactions
 #      add a button to show all pending txs
 #      get state of current budget
