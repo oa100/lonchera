@@ -1,19 +1,15 @@
-from datetime import datetime
 import logging
 import os
 from typing import List
-import pytz
 
 from dotenv import load_dotenv
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.constants import ParseMode, ReactionEmoji
+from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
 from lunchable import LunchMoney
-from lunchable.models import TransactionObject, TransactionUpdateObject
 
-from buttons import apply_category, show_categories, get_buttons, show_subcategories
-from messaging import send_transaction_message
+from handlers import apply_category, dump_plaid_details, mark_tx_as_reviewed, set_tx_notes, show_categories, show_subcategories
+from messaging import get_buttons, send_transaction_message
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s [%(name)s] %(levelname)s: %(message)s')
@@ -79,48 +75,15 @@ def setup_handlers(config):
             return await apply_category(lunch, update, context)
         
         if query.data.startswith("plaid"):
-            transaction = lunch.get_transaction(transaction_id)
-            plaid_metadata = transaction.plaid_metadata
-            plaid_details = f"*Plaid Metadata*\n\n"
-            for key, value in plaid_metadata.items():
-                if value is not None:
-                    plaid_details += f"*{key}:* `{value}`\n"
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=plaid_details,
-                parse_mode=ParseMode.MARKDOWN,
-                reply_to_message_id=query.message.message_id,
-            )
-
-            await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(get_buttons(transaction_id, plaid=False)))
-            return
+            return await dump_plaid_details(lunch, update, context)
         
         if query.data.startswith("review"):
-            try:
-                lunch.update_transaction(transaction_id, TransactionUpdateObject(status='cleared'))
-
-                # Remove the inline keyboard (button)
-                await query.edit_message_reply_markup(reply_markup=None)
-            except Exception as e:
-                await query.edit_message_text(text=f"Error updating transaction: {str(e)}")
-            return
+            return await mark_tx_as_reviewed(lunch, update)
         
         await context.bot.send_message(chat_id=chat_id, text="Unknown command")
 
     async def handle_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        replying_to_msg_id = update.message.reply_to_message.message_id
-        tx_id = context.bot_data.get(replying_to_msg_id, None)
-        if tx_id:
-            logger.info(f"Setting notes to transaction ({tx_id}): {update.message.text}")
-            lunch.update_transaction(tx_id, TransactionUpdateObject(notes=update.message.text))
-            note_msg_id = update.message.message_id
-            await context.bot.set_message_reaction(
-                chat_id=update.message.chat_id,
-                message_id=note_msg_id,
-                reaction=ReactionEmoji.BANANA,
-            )
-        else:
-            logger.error("No transaction ID found in bot data")
+        await set_tx_notes(lunch, update, context)
 
 
     application.add_handler(CommandHandler("start", start))

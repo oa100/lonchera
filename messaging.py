@@ -2,16 +2,27 @@ from datetime import datetime
 import logging
 import pytz
 
-from telegram import InlineKeyboardMarkup
+from telegram import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from lunchable.models import TransactionObject
 
-from buttons import get_buttons
-
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s [%(name)s] %(levelname)s: %(message)s')
 logger = logging.getLogger('messaging')
+
+
+def get_buttons(transaction_id: int, plaid=True, skip=True, mark_reviewed=True, categorize=True):
+    buttons = []
+    if categorize:
+        buttons.append(InlineKeyboardButton("Categorize", callback_data=f"categorize_{transaction_id}"))
+    if plaid:
+        buttons.append(InlineKeyboardButton("Dump plaid details", callback_data=f"plaid_{transaction_id}"))
+    if skip:
+        buttons.append(InlineKeyboardButton("Skip", callback_data=f"skip_{transaction_id}"))
+    if mark_reviewed:
+        buttons.append(InlineKeyboardButton("Mark as Reviewed", callback_data=f"review_{transaction_id}"))
+    # max two buttons per row
+    buttons = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
+    return buttons
 
 async def send_transaction_message(context: ContextTypes.DEFAULT_TYPE, transaction: TransactionObject, chat_id, message_id=None) -> None:
     # Format the amount with monospaced font
@@ -69,3 +80,13 @@ async def send_transaction_message(context: ContextTypes.DEFAULT_TYPE, transacti
         context.bot_data[msg.id] = transaction.id
         logger.info(f"Current bot data: {context.bot_data}")
 
+
+async def send_plaid_details(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, chat_id: int, transaction_id: str, plaid_details: str):
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=plaid_details,
+        parse_mode=ParseMode.MARKDOWN,
+        reply_to_message_id=query.message.message_id,
+    )
+
+    await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(get_buttons(transaction_id, plaid=False)))
