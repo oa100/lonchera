@@ -29,7 +29,7 @@ def setup_handlers(config):
         await update.message.reply_text("Bot started. Use /check_transactions to fetch unreviewed transactions.")
 
     async def check_transactions_manual(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        transactions = check_transactions_auto(context)
+        transactions = await check_transactions_auto(context)
         
         if not transactions:
             await update.message.reply_text("No unreviewed transactions found.")
@@ -47,6 +47,7 @@ def setup_handlers(config):
             await send_transaction_message(context, transaction, '378659027')
 
         return transactions
+
 
     async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         query = update.callback_query
@@ -80,7 +81,8 @@ def setup_handlers(config):
         if query.data.startswith("review"):
             return await mark_tx_as_reviewed(lunch, update)
         
-        await context.bot.send_message(chat_id=chat_id, text="Unknown command")
+        await context.bot.send_message(chat_id=chat_id, text=f"Unknown command {query.data}")
+
 
     async def handle_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await set_tx_notes(lunch, update, context)
@@ -94,6 +96,11 @@ def setup_handlers(config):
     job_queue.run_repeating(check_transactions_auto, interval=1800, first=5)
 
     application.add_handler(MessageHandler(filters.TEXT & filters.REPLY, handle_reply))
+
+    # Setting up the bot commands
+    application.bot.set_my_commands([
+        ("check_transactions", "Check for new transactions"),
+    ])
 
     logger.info("Telegram handlers set up successfully")
 
