@@ -1,17 +1,23 @@
 from datetime import datetime
-import io
+import logging
 import os
-import requests
 from typing import List
 import pytz
 
 from dotenv import load_dotenv
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InputMediaPhoto
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode, ReactionEmoji
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
 from lunchable import LunchMoney
 from lunchable.models import TransactionObject, TransactionUpdateObject
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s [%(name)s] %(levelname)s: %(message)s')
+logger = logging.getLogger('lonchera')
+
+httpx_logger = logging.getLogger("httpx")
+httpx_logger.setLevel(logging.WARNING)
 
 already_sent_transactions: List[int] = []
 
@@ -65,6 +71,7 @@ async def send_transaction_message(context: ContextTypes.DEFAULT_TYPE, transacti
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if message_id:
+        # edit existing message
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=message_id,
@@ -73,12 +80,15 @@ async def send_transaction_message(context: ContextTypes.DEFAULT_TYPE, transacti
             reply_markup=reply_markup
         )
     else:
-        await context.bot.send_message(
+        # send a new message
+        msg = await context.bot.send_message(
             chat_id=chat_id,
             text=message,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=reply_markup
         )
+        context.bot_data[msg.id] = transaction.id
+        logger.info(f"Current bot data: {context.bot_data}")
 
 def setup_handlers(config):
     application = Application.builder().token(config["TELEGRAM_BOT_TOKEN"]).build()
@@ -96,11 +106,12 @@ def setup_handlers(config):
             return
 
     async def check_transactions_auto(context: ContextTypes.DEFAULT_TYPE) -> None:
+        logger.info("Polling for new transactions...")
         transactions = lunch.get_transactions(status='uncleared', pending=False)
         
         for transaction in transactions:
             if transaction.id in already_sent_transactions:
-                print('Ignoring already sent transaction: ', transaction.id)
+                logger.warn(f"Ignoring already sent transaction: {transaction.id}")
                 continue
             already_sent_transactions.append(transaction.id)
             await send_transaction_message(context, transaction, '378659027')
@@ -185,12 +196,32 @@ def setup_handlers(config):
         
         await context.bot.send_message(chat_id=chat_id, text="Unknown command")
 
+    async def handle_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        replying_to_msg_id = update.message.reply_to_message.message_id
+        tx_id = context.bot_data.get(replying_to_msg_id, None)
+        if tx_id:
+            logger.info(f"Setting notes to transaction ({tx_id}): {update.message.text}")
+            lunch.update_transaction(tx_id, TransactionUpdateObject(notes=update.message.text))
+            note_msg_id = update.message.message_id
+            await context.bot.set_message_reaction(
+                chat_id=update.message.chat_id,
+                message_id=note_msg_id,
+                reaction=ReactionEmoji.BANANA,
+            )
+        else:
+            logger.error("No transaction ID found in bot data")
+
+
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("check_transactions", check_transactions_manual))
     application.add_handler(CallbackQueryHandler(button_callback))
 
     job_queue = application.job_queue
-    job_queue.run_repeating(check_transactions_auto, interval=1800, first=1)
+    job_queue.run_repeating(check_transactions_auto, interval=1800, first=5)
+
+    application.add_handler(MessageHandler(filters.TEXT & filters.REPLY, handle_reply))
+
+    logger.info("Telegram handlers set up successfully")
 
     return application
 
