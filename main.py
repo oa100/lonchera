@@ -12,6 +12,9 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 from lunchable import LunchMoney
 from lunchable.models import TransactionObject, TransactionUpdateObject
 
+from buttons import apply_category, show_categories, get_buttons, show_subcategories
+from messaging import send_transaction_message
+
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s [%(name)s] %(levelname)s: %(message)s')
 logger = logging.getLogger('lonchera')
@@ -21,81 +24,12 @@ httpx_logger.setLevel(logging.WARNING)
 
 already_sent_transactions: List[int] = []
 
-def get_buttons(transaction_id: int, plaid=True, skip=True, mark_reviewed=True, categorize=True):
-    buttons = []
-    if categorize:
-        buttons.append(InlineKeyboardButton("Categorize", callback_data=f"categorize_{transaction_id}"))
-    if plaid:
-        buttons.append(InlineKeyboardButton("Dump plaid details", callback_data=f"plaid_{transaction_id}"))
-    if skip:
-        buttons.append(InlineKeyboardButton("Skip", callback_data=f"skip_{transaction_id}"))
-    if mark_reviewed:
-        buttons.append(InlineKeyboardButton("Mark as Reviewed", callback_data=f"review_{transaction_id}"))
-    # max two buttons per row
-    buttons = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
-    return buttons
-
-async def send_transaction_message(context: ContextTypes.DEFAULT_TYPE, transaction: TransactionObject, chat_id, message_id=None) -> None:
-    # Format the amount with monospaced font
-    formatted_amount = f"`${transaction.amount:.2f}`"
-
-    # Get the datetime from plaid_metadata
-    authorized_datetime = transaction.plaid_metadata.get('authorized_datetime')
-    if authorized_datetime:
-        date_time = datetime.fromisoformat(authorized_datetime.replace('Z', '+00:00'))
-        pst_tz = pytz.timezone('US/Pacific')
-        pst_date_time = date_time.astimezone(pst_tz)
-        formatted_date_time = pst_date_time.strftime("%Y-%m-%d %I:%M:%S %p PST")
-    else:
-        formatted_date_time = transaction.plaid_metadata.get('date')
-
-    # Get category and category group
-    category = transaction.category_name or "Uncategorized"
-    category_group = transaction.category_group_name or "No Group"
-
-    # Get account display name
-    account_name = transaction.plaid_account_display_name or "N/A"
-
-    # split the category group into two: the first emoji and the rest of the string
-    emoji, rest = category_group.split(" ", 1)
-
-    message = f"{emoji} #*{rest.replace(" ", "_")}*\n\n"
-    message += f"*Payee:* {transaction.payee}\n"
-    message += f"*Amount:* {formatted_amount}\n"
-    message += f"*Date/Time:* {formatted_date_time}\n"
-    message += f"*Category:* #{category} \n"
-    message += f"*Account:* #{account_name}\n"
-
-
-    keyboard = get_buttons(transaction.id)
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    if message_id:
-        # edit existing message
-        await context.bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=message_id,
-            text=message,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=reply_markup
-        )
-    else:
-        # send a new message
-        msg = await context.bot.send_message(
-            chat_id=chat_id,
-            text=message,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=reply_markup
-        )
-        context.bot_data[msg.id] = transaction.id
-        logger.info(f"Current bot data: {context.bot_data}")
-
 def setup_handlers(config):
     application = Application.builder().token(config["TELEGRAM_BOT_TOKEN"]).build()
 
     lunch = LunchMoney(access_token=config["LUNCH_MONEY_TOKEN"])
 
-    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def start(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Bot started. Use /check_transactions to fetch unreviewed transactions.")
 
     async def check_transactions_manual(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -120,7 +54,7 @@ def setup_handlers(config):
 
     async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         query = update.callback_query
-        print("query.data", query.data)
+        logger.info(f"Button pressed: {query.data}")
 
         chat_id = query.message.chat.id
         await query.answer()
@@ -136,36 +70,13 @@ def setup_handlers(config):
             return
 
         if query.data.startswith("categorize"):
-            transaction = lunch.get_transaction(transaction_id)
-            categories = lunch.get_categories()
-            category_buttons = []
-            for category in categories:
-                if category.group_id is None:
-                    category_buttons.append(InlineKeyboardButton(category.name, callback_data=f"subcategorize_{transaction_id}_{category.id}"))
-            category_buttons = [category_buttons[i:i + 3] for i in range(0, len(category_buttons), 3)]
-            category_buttons.append([InlineKeyboardButton("Cancel", callback_data=f"cancelCategorization_{transaction_id}")])
-            await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(category_buttons))
-            return
+            return await show_categories(lunch, update)
         
         if query.data.startswith("subcategorize"):
-            transaction_id, category_id = query.data.split("_")[1:]
-            subcategories = lunch.get_categories()
-            subcategory_buttons = []
-            for subcategory in subcategories:
-                if str(subcategory.group_id) == str(category_id):
-                    subcategory_buttons.append(InlineKeyboardButton(subcategory.name, callback_data=f"applyCategory_{transaction_id}_{subcategory.id}"))
-            subcategory_buttons = [subcategory_buttons[i:i + 3] for i in range(0, len(subcategory_buttons), 3)]
-            subcategory_buttons.append([InlineKeyboardButton("Cancel", callback_data=f"cancelCategorization_{transaction_id}")])
-            
-            await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(subcategory_buttons))
-            return
+            return await show_subcategories(lunch, update)
         
         if query.data.startswith("applyCategory"):
-            transaction_id, category_id = query.data.split("_")[1:]
-            lunch.update_transaction(transaction_id, TransactionUpdateObject(category_id=category_id))
-            updated_transaction = lunch.get_transaction(transaction_id)
-            await send_transaction_message(context, updated_transaction, chat_id, query.message.message_id)
-            return
+            return await apply_category(lunch, update, context)
         
         if query.data.startswith("plaid"):
             transaction = lunch.get_transaction(transaction_id)
@@ -243,3 +154,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# TODO add menu to manually check transactions
+#      figure out persistent storage and multiplexing
+#      add button to trigger plaid transactions
+#      add a button to show all pending txs
+#      get state of current budget
