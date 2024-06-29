@@ -35,16 +35,27 @@ def setup_handlers(config):
             await update.message.reply_text("No unreviewed transactions found.")
             return
         
+    async def check_pending_transactions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        transactions = await check_transactions_auto(context, pending=True, ignore_already_sent=False)
+        
+        if not transactions:
+            await update.message.reply_text("No pending transactions found.")
+            return
+        
     async def trigger_plaid_refresh(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         lunch.trigger_fetch_from_plaid()
         await update.message.reply_text("Plaid refresh triggered.")
 
-    async def check_transactions_auto(context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def check_transactions_auto(context: ContextTypes.DEFAULT_TYPE, pending=False, ignore_already_sent=True) -> None:
         logger.info("Polling for new transactions...")
-        transactions = lunch.get_transactions(status='uncleared', pending=False)
+        if pending:
+            transactions = lunch.get_transactions(pending=True)
+            transactions = [tx for tx in transactions if tx.is_pending == True and tx.notes == None]
+        else:
+            transactions = lunch.get_transactions(status='uncleared', pending=pending)
         
         for transaction in transactions:
-            if transaction.id in already_sent_transactions:
+            if ignore_already_sent and transaction.id in already_sent_transactions:
                 logger.warn(f"Ignoring already sent transaction: {transaction.id}")
                 continue
             already_sent_transactions.append(transaction.id)
@@ -94,6 +105,7 @@ def setup_handlers(config):
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("check_transactions", check_transactions_manual))
+    application.add_handler(CommandHandler("pending_transactions", check_pending_transactions))
     application.add_handler(CommandHandler("refresh", trigger_plaid_refresh))
     application.add_handler(CallbackQueryHandler(button_callback))
 
@@ -132,5 +144,5 @@ if __name__ == "__main__":
 
 # TODO 
 #      figure out persistent storage and multiplexing
-#      add a button to show all pending txs
 #      get state of current budget
+#      add tags when reply message has existent #keywords

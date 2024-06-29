@@ -19,7 +19,7 @@ def get_buttons(transaction_id: int, plaid=True, skip=True, mark_reviewed=True, 
     if skip:
         buttons.append(InlineKeyboardButton("Skip", callback_data=f"skip_{transaction_id}"))
     if mark_reviewed:
-        buttons.append(InlineKeyboardButton("Mark as Reviewed", callback_data=f"review_{transaction_id}"))
+        buttons.append(InlineKeyboardButton("Mark as reviewed", callback_data=f"review_{transaction_id}"))
     # max two buttons per row
     buttons = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
     return buttons
@@ -53,7 +53,9 @@ async def send_transaction_message(context: ContextTypes.DEFAULT_TYPE, transacti
     message += f"*Amount:* {formatted_amount}\n"
     message += f"*Date/Time:* {formatted_date_time}\n"
     message += f"*Category:* #{category.title().replace(" ", "")} \n"
-    message += f"*Account:* #{account_name}\n"
+    message += f"*Account:* #{account_name.title().replace(" ", "")}\n"
+    if transaction.notes:
+        message += f"*Notes:* {transaction.notes}\n"
 
 
     keyboard = get_buttons(transaction.id)
