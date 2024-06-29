@@ -47,8 +47,9 @@ async def send_transaction_message(context: ContextTypes.DEFAULT_TYPE, transacti
 
     # split the category group into two: the first emoji and the rest of the string
     emoji, rest = category_group.split(" ", 1)
+    rest = rest.replace(" ", "_")
 
-    message = f"{emoji} #*{rest.replace(" ", "_")}*\n\n"
+    message = f"{emoji} #*{rest}*\n\n"
     message += f"*Payee:* {transaction.payee}\n"
     message += f"*Amount:* {formatted_amount}\n"
     message += f"*Date/Time:* {formatted_date_time}\n"
