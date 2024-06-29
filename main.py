@@ -7,6 +7,7 @@ from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
 from lunchable import LunchMoney
+from lunchable.models import TransactionObject
 
 from handlers import apply_category, dump_plaid_details, mark_tx_as_reviewed, set_tx_notes, show_categories, show_subcategories
 from messaging import get_buttons, send_transaction_message
@@ -29,14 +30,14 @@ def setup_handlers(config):
         await update.message.reply_text("Bot started. Use /check_transactions to fetch unreviewed transactions.")
 
     async def check_transactions_manual(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        transactions = await check_transactions_auto(context)
+        transactions = await check_transactions_and_telegram_them(context)
         
         if not transactions:
             await update.message.reply_text("No unreviewed transactions found.")
             return
         
     async def check_pending_transactions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        transactions = await check_transactions_auto(context, pending=True, ignore_already_sent=False)
+        transactions = await check_transactions_and_telegram_them(context, pending=True, ignore_already_sent=False)
         
         if not transactions:
             await update.message.reply_text("No pending transactions found.")
@@ -46,7 +47,7 @@ def setup_handlers(config):
         lunch.trigger_fetch_from_plaid()
         await update.message.reply_text("Plaid refresh triggered.")
 
-    async def check_transactions_auto(context: ContextTypes.DEFAULT_TYPE, pending=False, ignore_already_sent=True) -> None:
+    async def check_transactions_and_telegram_them(context: ContextTypes.DEFAULT_TYPE, pending=False, ignore_already_sent=True) -> List[TransactionObject]:
         logger.info("Polling for new transactions...")
         if pending:
             transactions = lunch.get_transactions(pending=True)
@@ -110,14 +111,9 @@ def setup_handlers(config):
     application.add_handler(CallbackQueryHandler(button_callback))
 
     job_queue = application.job_queue
-    job_queue.run_repeating(check_transactions_auto, interval=1800, first=5)
+    job_queue.run_repeating(check_transactions_and_telegram_them, interval=1800, first=5)
 
     application.add_handler(MessageHandler(filters.TEXT & filters.REPLY, handle_reply))
-
-    # Setting up the bot commands
-    application.bot.set_my_commands([
-        ("check_transactions", "Check for new transactions"),
-    ])
 
     logger.info("Telegram handlers set up successfully")
 

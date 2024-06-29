@@ -1,0 +1,22 @@
+# Ignore virtual environment
+venv/
+env/
+*.pyc
+__pycache__
+
+# Ignore git directory
+.git
+
+# Ignore .env file (contains sensitive information)
+.env
+
+# Ignore editor specific files
+.vscode/
+.idea/
+
+# Ignore logs
+*.log
+
+# Ignore OS generated files
+.DS_Store
+Thumbs.db
