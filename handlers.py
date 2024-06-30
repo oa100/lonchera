@@ -50,7 +50,9 @@ async def handle_apply_category(lunch: LunchMoney, update: Update, context: Cont
 
     transaction_id, category_id = query.data.split("_")[1:]
     lunch.update_transaction(transaction_id, TransactionUpdateObject(category_id=category_id))
+    logger.info(f"Changing category for tx {transaction_id} to {category_id}")
     updated_transaction = lunch.get_transaction(transaction_id)
+    logger.info(f"Updated transaction: {updated_transaction}")
     await send_transaction_message(context, updated_transaction, chat_id, query.message.message_id)
 
 

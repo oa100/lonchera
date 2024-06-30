@@ -11,7 +11,7 @@ from lunchable.models import TransactionObject
 logger = logging.getLogger('messaging')
 
 
-def get_tx_buttons(transaction_id: int, plaid=True, skip=True, mark_reviewed=True, categorize=True):
+def get_tx_buttons(transaction_id: int, plaid=True, skip=True, mark_reviewed=True, categorize=True) -> InlineKeyboardMarkup:
     buttons = []
     if categorize:
         buttons.append(InlineKeyboardButton("Categorize", callback_data=f"categorize_{transaction_id}"))
@@ -23,13 +23,10 @@ def get_tx_buttons(transaction_id: int, plaid=True, skip=True, mark_reviewed=Tru
         buttons.append(InlineKeyboardButton("Mark as reviewed", callback_data=f"review_{transaction_id}"))
     # max two buttons per row
     buttons = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
-    return buttons
+    return InlineKeyboardMarkup(buttons)
 
 
 async def send_transaction_message(context: ContextTypes.DEFAULT_TYPE, transaction: TransactionObject, chat_id, message_id=None) -> None:
-    # Format the amount with monospaced font
-    formatted_amount = f"`${transaction.amount:.2f}`"
-
     # Get the datetime from plaid_metadata
     authorized_datetime = transaction.plaid_metadata.get('authorized_datetime')
     if authorized_datetime:
@@ -51,23 +48,32 @@ async def send_transaction_message(context: ContextTypes.DEFAULT_TYPE, transacti
     emoji, rest = category_group.split(" ", 1)
     rest = rest.title().replace(" ", "")
 
-    message = f"{emoji} #*{rest}*\n\n"
+    recurring = ""
+    if transaction.recurring_type:
+        recurring = "(recurring 🔄)"
+
+    message = f"{emoji} #*{rest}* {recurring}\n\n"
     message += f"*Payee:* {transaction.payee}\n"
-    message += f"*Amount:* {formatted_amount}\n"
+    message += f"*Amount:* {transaction.amount:.2f}\n"
     message += f"*Date/Time:* {formatted_date_time}\n"
     message += f"*Category:* #{category.title().replace(" ", "")} \n"
     message += f"*Account:* #{account_name.title().replace(" ", "")}\n"
     if transaction.notes:
         message += f"*Notes:* {transaction.notes}\n"
+    if transaction.tags:
+        tags = [f"#{tag.name}" for tag in transaction.tags]
+        message += f"*Tags:* {', '.join(tags)}\n"
     if transaction.is_pending:
         message += f"\n_This is a pending transaction_\n"
 
+    # recurring transactions are not categorizable
+    show_categorize = transaction.recurring_type is None
 
     if transaction.is_pending:
         # when a transaction is pending, we don't want to mark it as reviewed
-        keyboard = get_tx_buttons(transaction.id, mark_reviewed=False, skip=False)
+        keyboard = get_tx_buttons(transaction.id, mark_reviewed=False, skip=False, categorize=show_categorize)
     else:
-        keyboard = get_tx_buttons(transaction.id)
+        keyboard = get_tx_buttons(transaction.id, categorize=show_categorize)
 
     if message_id:
         # edit existing message

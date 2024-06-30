@@ -161,6 +161,5 @@ if __name__ == "__main__":
 # TODO 
 #      figure out persistent storage and multiplexing
 #      budget: show transactions for budget category
-#      refactor budget machinery
 #      add tags when reply message has existent #keywords
 #      add basic readme

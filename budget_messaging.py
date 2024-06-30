@@ -61,10 +61,10 @@ def build_budget_message(budget: List[BudgetObject]):
             cat_name = cat_name.title().replace(" ", "")
 
             msg += f"{emoji} `[{bar}]{extra}`\n"
-            msg += f"#*{cat_name}* - `{spent_already:.1f}` of `{budgeted:.1f}` USD (`{pct:.1f}%`)\n\n"
+            msg += f"#*{cat_name}* - `{spent_already:.1f}` of `{budgeted:.1f}` {budget_data.budget_currency} (`{pct:.1f}%`)\n\n"
 
     msg = f"*Budget for {budget_date.strftime('%B %Y')}*\n\n{msg}"
-    return f"{msg}\n\nTotal spent: `{total_spent:.1f}` of `{total_budget:.1f}` USD (`{total_spent*100/total_budget:.1f}%`)"
+    return f"{msg}\n\nTotal spent: `{total_spent:.1f}` of `{total_budget:.1f}` {budget_data.budget_currency} (`{total_spent*100/total_budget:.1f}%`)"
 
 
 
@@ -115,8 +115,9 @@ async def show_bugdget_for_category(update: Update, all_budget: List[BudgetObjec
     budget_date = next(iter(category_budget[0].data.keys()))
 
     for budget_item in category_budget:
-        spent_already = budget_item.data[budget_date].spending_to_base
-        budgeted = budget_item.data[budget_date].budget_to_base
+        budget_data = budget_item.data[budget_date]
+        spent_already = budget_data.spending_to_base
+        budgeted = budget_data.budget_to_base
         if budgeted == 0 or budgeted is None:
             continue
 
@@ -136,11 +137,20 @@ async def show_bugdget_for_category(update: Update, all_budget: List[BudgetObjec
             extra = "▓"*(blocks-10)
 
         msg += f"`[{bar}]{extra}`\n"
-        msg += f"*{budget_item.category_name}* - `{spent_already:.1f}` of `{budgeted:.1f}` USD (`{pct:.1f}%`)\n\n"
+        msg += f"*{budget_item.category_name}* - `{spent_already:.1f}` of `{budgeted:.1f}` {budget_data.budget_currency} (`{pct:.1f}%`)\n"
+
+        # show transactions list
+        if budget_data.num_transactions > 0:
+            plural = ""
+            if budget_data.num_transactions > 1:
+                plural = "s"
+            msg += f"    _{budget_data.num_transactions} transaction{plural}_\n\n"
+        else:
+            msg += "\n"
 
     if total_budget > 0:
         msg = f"*{category_group_name} budget for {budget_date.strftime('%B %Y')}*\n\n{msg}"
-        msg += f"Total spent: `{total_spent:.1f}` of `{total_budget:.1f}` USD (`{total_spent*100/total_budget:.1f}%`)"
+        msg += f"Total spent: `{total_spent:.1f}` of `{total_budget:.1f}` {budget_data.budget_currency} (`{total_spent*100/total_budget:.1f}%`)"
     else:
         msg = "This category seems to have a global budget, not a per subcategory one"
 
@@ -148,6 +158,7 @@ async def show_bugdget_for_category(update: Update, all_budget: List[BudgetObjec
     for budget_item in all_budget:
         if budget_item.category_group_name is None and budget_item.category_id is not None:
             categories.append(budget_item)
+    
     await update.callback_query.edit_message_text(
         text=msg,
         parse_mode=ParseMode.MARKDOWN,
