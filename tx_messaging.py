@@ -69,8 +69,6 @@ async def send_transaction_message(context: ContextTypes.DEFAULT_TYPE, transacti
     else:
         keyboard = get_tx_buttons(transaction.id)
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
     if message_id:
         # edit existing message
         await context.bot.edit_message_text(
@@ -78,7 +76,7 @@ async def send_transaction_message(context: ContextTypes.DEFAULT_TYPE, transacti
             message_id=message_id,
             text=message,
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=reply_markup
+            reply_markup=keyboard
         )
     else:
         # send a new message
@@ -87,7 +85,7 @@ async def send_transaction_message(context: ContextTypes.DEFAULT_TYPE, transacti
             chat_id=chat_id,
             text=message,
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=reply_markup
+            reply_markup=keyboard
         )
         context.bot_data[msg.id] = transaction.id
         logger.info(f"Current bot data: {context.bot_data}")
@@ -102,4 +100,4 @@ async def send_plaid_details(query: CallbackQuery, context: ContextTypes.DEFAULT
         reply_to_message_id=query.message.message_id,
     )
 
-    await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(get_tx_buttons(transaction_id, plaid=False)))
+    await query.edit_message_reply_markup(reply_markup=get_tx_buttons(transaction_id, plaid=False))

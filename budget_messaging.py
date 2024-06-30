@@ -10,15 +10,16 @@ from typing import List
 logger = logging.getLogger('messaging')
 
 
-def get_bugdet_buttons():
-    return [
+def get_bugdet_buttons() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("Details", callback_data="showBudgetCategories"),
         ]
-    ]
+    ])
 
 
-def get_budget_category_buttons(budget_items: List[BudgetObject]):
+
+def get_budget_category_buttons(budget_items: List[BudgetObject]) -> InlineKeyboardMarkup:
     buttons = []
     for budget_item in budget_items:
         buttons.append(InlineKeyboardButton(budget_item.category_name, callback_data=f"showBudgetDetails_{budget_item.category_id}"))
@@ -28,7 +29,7 @@ def get_budget_category_buttons(budget_items: List[BudgetObject]):
 
     # add exit button
     buttons.append([InlineKeyboardButton("Exit", callback_data="exitBudgetDetails")])
-    return buttons
+    return InlineKeyboardMarkup(buttons)
 
 
 
@@ -76,7 +77,7 @@ async def send_budget(update: Update, context: ContextTypes.DEFAULT_TYPE, budget
             chat_id=chat_id,
             text=msg,
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=InlineKeyboardMarkup(get_bugdet_buttons()),
+            reply_markup=get_bugdet_buttons(),
         )
     else:
         # TODO: handle this case
@@ -90,7 +91,7 @@ async def show_budget_categories(update: Update, _: ContextTypes.DEFAULT_TYPE, b
             categories.append(budget_item)
 
     query = update.callback_query
-    await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(get_budget_category_buttons(categories)))
+    await query.edit_message_reply_markup(reply_markup=get_budget_category_buttons(categories))
 
 
 
@@ -100,7 +101,7 @@ async def hide_budget_categories(update: Update, budget: List[BudgetObject]) -> 
     await query.edit_message_text(
         text=msg,
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=InlineKeyboardMarkup(get_bugdet_buttons()),
+        reply_markup=get_bugdet_buttons(),
     )
 
 
@@ -150,5 +151,5 @@ async def show_bugdget_for_category(update: Update, all_budget: List[BudgetObjec
     await update.callback_query.edit_message_text(
         text=msg,
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=InlineKeyboardMarkup(get_budget_category_buttons(categories)),
+        reply_markup=get_budget_category_buttons(categories),
     )

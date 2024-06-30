@@ -98,7 +98,7 @@ def setup_handlers(config):
         transaction_id = int(query.data.split("_")[1])
         
         if query.data.startswith("cancelCategorization"):
-            await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(get_tx_buttons(transaction_id)))
+            await query.edit_message_reply_markup(reply_markup=get_tx_buttons(transaction_id))
             return
 
         if query.data.startswith("categorize"):
