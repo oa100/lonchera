@@ -10,7 +10,7 @@ from telegram.constants import ReactionEmoji
 from lunchable import LunchMoney
 from lunchable.models import TransactionObject
 
-from handlers import apply_category, dump_plaid_details, mark_tx_as_reviewed, set_tx_notes, show_categories, show_subcategories
+from handlers import handle_apply_category, handle_dump_plaid_details, handle_hide_budget_categories, handle_show_budget, handle_show_budget_categories, handle_show_budget_for_category, handle_mark_tx_as_reviewed, handle_set_tx_notes, handle_show_categories, handle_show_subcategories
 from messaging import get_buttons, send_transaction_message
 
 logging.basicConfig(level=logging.INFO,
@@ -52,6 +52,10 @@ def setup_handlers(config):
             reaction=ReactionEmoji.HANDSHAKE,
         )
 
+    async def get_budget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        await handle_show_budget(lunch, update, context)
+
+
     async def check_transactions_and_telegram_them(context: ContextTypes.DEFAULT_TYPE, pending=False, ignore_already_sent=True) -> List[TransactionObject]:
         logger.info("Polling for new transactions...")
         if pending:
@@ -81,6 +85,16 @@ def setup_handlers(config):
             await query.edit_message_reply_markup(reply_markup=None)
             return
         
+        if query.data.startswith("showBudgetCategories"):
+            return await handle_show_budget_categories(lunch, update, context)
+        
+        if query.data.startswith("exitBudgetDetails"):
+            return await handle_hide_budget_categories(lunch, update)
+        
+        if query.data.startswith("showBudgetDetails"):
+            category_id = int(query.data.split("_")[1])
+            return await handle_show_budget_for_category(lunch, update, category_id)
+        
         transaction_id = int(query.data.split("_")[1])
         
         if query.data.startswith("cancelCategorization"):
@@ -88,31 +102,32 @@ def setup_handlers(config):
             return
 
         if query.data.startswith("categorize"):
-            return await show_categories(lunch, update)
+            return await handle_show_categories(lunch, update)
         
         if query.data.startswith("subcategorize"):
-            return await show_subcategories(lunch, update)
+            return await handle_show_subcategories(lunch, update)
         
         if query.data.startswith("applyCategory"):
-            return await apply_category(lunch, update, context)
+            return await handle_apply_category(lunch, update, context)
         
         if query.data.startswith("plaid"):
-            return await dump_plaid_details(lunch, update, context)
+            return await handle_dump_plaid_details(lunch, update, context)
         
         if query.data.startswith("review"):
-            return await mark_tx_as_reviewed(lunch, update)
+            return await handle_mark_tx_as_reviewed(lunch, update)
         
         await context.bot.send_message(chat_id=chat_id, text=f"Unknown command {query.data}")
 
 
     async def handle_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await set_tx_notes(lunch, update, context)
+        await handle_set_tx_notes(lunch, update, context)
 
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("check_transactions", check_transactions_manual))
     application.add_handler(CommandHandler("pending_transactions", check_pending_transactions))
     application.add_handler(CommandHandler("refresh", trigger_plaid_refresh))
+    application.add_handler(CommandHandler("show_budget", get_budget))
     application.add_handler(CallbackQueryHandler(button_callback))
 
     job_queue = application.job_queue
@@ -145,5 +160,7 @@ if __name__ == "__main__":
 
 # TODO 
 #      figure out persistent storage and multiplexing
-#      get state of current budget
+#      budget: show transactions for budget category
+#      refactor budget machinery
 #      add tags when reply message has existent #keywords
+#      add basic readme

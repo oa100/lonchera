@@ -1,15 +1,16 @@
+from datetime import datetime
 import logging
 from lunchable import LunchMoney, TransactionUpdateObject
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from telegram.constants import ReactionEmoji
 
-from messaging import send_plaid_details, send_transaction_message
+from messaging import hide_budget_categories, send_budget, send_plaid_details, send_transaction_message, show_budget_categories, show_bugdget_for_category
 
 logger = logging.getLogger('handlers')
 
 
-async def show_categories(lunch: LunchMoney, update: Update):
+async def handle_show_categories(lunch: LunchMoney, update: Update):
     """Updates the message to show the parent categories available"""
     query = update.callback_query
     transaction_id = int(query.data.split("_")[1])
@@ -25,7 +26,7 @@ async def show_categories(lunch: LunchMoney, update: Update):
     await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(category_buttons))
 
 
-async def show_subcategories(lunch: LunchMoney, update: Update):
+async def handle_show_subcategories(lunch: LunchMoney, update: Update):
     """Updates the transaction with the selected category."""
     query = update.callback_query
     transaction_id, category_id = query.data.split("_")[1:]
@@ -41,7 +42,7 @@ async def show_subcategories(lunch: LunchMoney, update: Update):
     await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(subcategory_buttons))
 
 
-async def apply_category(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_apply_category(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     chat_id = query.message.chat.id
 
@@ -51,7 +52,7 @@ async def apply_category(lunch: LunchMoney, update: Update, context: ContextType
     await send_transaction_message(context, updated_transaction, chat_id, query.message.message_id)
 
 
-async def dump_plaid_details(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_dump_plaid_details(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     transaction_id = int(query.data.split("_")[1])
 
@@ -66,7 +67,7 @@ async def dump_plaid_details(lunch: LunchMoney, update: Update, context: Context
     await send_plaid_details(query, context, chat_id, transaction_id, plaid_details)
 
 
-async def mark_tx_as_reviewed(lunch: LunchMoney, update: Update):
+async def handle_mark_tx_as_reviewed(lunch: LunchMoney, update: Update):
     query = update.callback_query
     transaction_id = int(query.data.split("_")[1])
     try:
@@ -76,7 +77,7 @@ async def mark_tx_as_reviewed(lunch: LunchMoney, update: Update):
         await query.edit_message_text(text=f"Error updating transaction: {str(e)}")
 
 
-async def set_tx_notes(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_set_tx_notes(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
     replying_to_msg_id = update.message.reply_to_message.message_id
     tx_id = context.bot_data.get(replying_to_msg_id, None)
     if tx_id:
@@ -90,3 +91,47 @@ async def set_tx_notes(lunch: LunchMoney, update: Update, context: ContextTypes.
         )
     else:
         logger.error("No transaction ID found in bot data")
+
+
+
+def get_default_budget(lunch: LunchMoney):
+    # get a datetime of the first day of the current month
+    first_day_current_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # get a datetime of the current day
+    current_day = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    return lunch.get_budgets(start_date=first_day_current_month, end_date=current_day)
+
+
+
+async def handle_show_budget(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    budget = get_default_budget(lunch)
+    await send_budget(update, context, budget)
+
+
+
+async def handle_show_budget_categories(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    budget = get_default_budget(lunch)
+    await show_budget_categories(update, context, budget)
+
+
+
+async def handle_hide_budget_categories(lunch: LunchMoney, update: Update):
+    budget = get_default_budget(lunch)
+    await hide_budget_categories(update, budget)
+
+
+
+async def handle_show_budget_for_category(lunch: LunchMoney, update: Update, category_id: int):
+    budget = get_default_budget(lunch)
+
+    # get super category
+    category = lunch.get_category(category_id)
+    children_categories_ids = [child.id for child in category.children]
+
+    sub_budget = []
+    for budget_item in budget:
+        if budget_item.category_id in children_categories_ids:
+            sub_budget.append(budget_item)
+
+    await show_bugdget_for_category(update, budget, sub_budget)

@@ -19,8 +19,7 @@ docker build -t "${FULL_IMAGE_NAME}" .
 
 echo "Docker image built successfully"
 
-echo "Stopping any existing container named ${IMAGE_NAME}"
-docker stop "${IMAGE_NAME}" 2>/dev/null || true
+
 
 echo "Running Docker container as daemon"
 
