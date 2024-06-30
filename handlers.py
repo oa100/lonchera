@@ -84,21 +84,35 @@ async def handle_mark_tx_as_reviewed(lunch: LunchMoney, update: Update):
 
 
 
-async def handle_set_tx_notes(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_set_tx_notes_or_tags(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Updates the transaction notes."""
     replying_to_msg_id = update.message.reply_to_message.message_id
     tx_id = context.bot_data.get(replying_to_msg_id, None)
-    if tx_id:
-        logger.info(f"Setting notes to transaction ({tx_id}): {update.message.text}")
-        lunch.update_transaction(tx_id, TransactionUpdateObject(notes=update.message.text))
-        note_msg_id = update.message.message_id
-        await context.bot.set_message_reaction(
-            chat_id=update.message.chat_id,
-            message_id=note_msg_id,
-            reaction=ReactionEmoji.WRITING_HAND,
-        )
-    else:
+
+    if tx_id is None:
         logger.error("No transaction ID found in bot data")
+        return
+
+    msg_text = update.message.text
+    message_are_tags = True
+    for word in msg_text.split(" "):
+        if not word.startswith("#"):
+            message_are_tags = False
+            break
+
+    if message_are_tags:
+        tags_without_hashtag = [tag[1:] for tag in msg_text.split(" ") if tag.startswith("#")]
+        logger.info(f"Setting tags to transaction ({tx_id}): {tags_without_hashtag}")
+        lunch.update_transaction(tx_id, TransactionUpdateObject(tags=tags_without_hashtag))
+    else:
+        logger.info(f"Setting notes to transaction ({tx_id}): {msg_text}")
+        lunch.update_transaction(tx_id, TransactionUpdateObject(notes=msg_text))
+                                    
+    await context.bot.set_message_reaction(
+        chat_id=update.message.chat_id,
+        message_id=update.message.message_id,
+        reaction=ReactionEmoji.WRITING_HAND,
+    )
 
 
 

@@ -10,7 +10,7 @@ from telegram.constants import ReactionEmoji
 from lunchable import LunchMoney
 from lunchable.models import TransactionObject
 
-from handlers import handle_apply_category, handle_dump_plaid_details, handle_hide_budget_categories, handle_show_budget, handle_show_budget_categories, handle_show_budget_for_category, handle_mark_tx_as_reviewed, handle_set_tx_notes, handle_show_categories, handle_show_subcategories
+from handlers import handle_apply_category, handle_dump_plaid_details, handle_hide_budget_categories, handle_show_budget, handle_show_budget_categories, handle_show_budget_for_category, handle_mark_tx_as_reviewed, handle_set_tx_notes_or_tags, handle_show_categories, handle_show_subcategories
 from tx_messaging import get_tx_buttons, send_transaction_message
 
 logging.basicConfig(level=logging.INFO,
@@ -120,7 +120,7 @@ def setup_handlers(config):
 
 
     async def handle_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await handle_set_tx_notes(lunch, update, context)
+        await handle_set_tx_notes_or_tags(lunch, update, context)
 
 
     application.add_handler(CommandHandler("start", start))
@@ -160,6 +160,4 @@ if __name__ == "__main__":
 
 # TODO 
 #      figure out persistent storage and multiplexing
-#      budget: show transactions for budget category
-#      add tags when reply message has existent #keywords
 #      add basic readme
