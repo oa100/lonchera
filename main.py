@@ -5,6 +5,7 @@ from typing import List
 from dotenv import load_dotenv
 from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
+from telegram.constants import ReactionEmoji
 
 from lunchable import LunchMoney
 from lunchable.models import TransactionObject
@@ -43,9 +44,13 @@ def setup_handlers(config):
             await update.message.reply_text("No pending transactions found.")
             return
         
-    async def trigger_plaid_refresh(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+    async def trigger_plaid_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         lunch.trigger_fetch_from_plaid()
-        await update.message.reply_text("Plaid refresh triggered.")
+        await context.bot.set_message_reaction(
+            chat_id=update.message.chat_id,
+            message_id=update.message.message_id,
+            reaction=ReactionEmoji.HANDSHAKE,
+        )
 
     async def check_transactions_and_telegram_them(context: ContextTypes.DEFAULT_TYPE, pending=False, ignore_already_sent=True) -> List[TransactionObject]:
         logger.info("Polling for new transactions...")

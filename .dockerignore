@@ -8,7 +8,7 @@ __pycache__
 .git
 
 # Ignore .env file (contains sensitive information)
-.env
+# .env
 
 # Ignore editor specific files
 .vscode/
