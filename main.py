@@ -11,7 +11,7 @@ from lunchable import LunchMoney
 from lunchable.models import TransactionObject
 
 from handlers import handle_apply_category, handle_dump_plaid_details, handle_hide_budget_categories, handle_show_budget, handle_show_budget_categories, handle_show_budget_for_category, handle_mark_tx_as_reviewed, handle_set_tx_notes, handle_show_categories, handle_show_subcategories
-from messaging import get_buttons, send_transaction_message
+from tx_messaging import get_tx_buttons, send_transaction_message
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s [%(name)s] %(levelname)s: %(message)s')
@@ -98,7 +98,7 @@ def setup_handlers(config):
         transaction_id = int(query.data.split("_")[1])
         
         if query.data.startswith("cancelCategorization"):
-            await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(get_buttons(transaction_id)))
+            await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(get_tx_buttons(transaction_id)))
             return
 
         if query.data.startswith("categorize"):

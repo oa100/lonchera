@@ -5,7 +5,8 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from telegram.constants import ReactionEmoji
 
-from messaging import hide_budget_categories, send_budget, send_plaid_details, send_transaction_message, show_budget_categories, show_bugdget_for_category
+from budget_messaging import hide_budget_categories, send_budget, show_budget_categories, show_bugdget_for_category
+from tx_messaging import send_plaid_details, send_transaction_message
 
 logger = logging.getLogger('handlers')
 
@@ -43,6 +44,7 @@ async def handle_show_subcategories(lunch: LunchMoney, update: Update):
 
 
 async def handle_apply_category(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Updates the transaction with the selected category."""
     query = update.callback_query
     chat_id = query.message.chat.id
 
@@ -53,6 +55,7 @@ async def handle_apply_category(lunch: LunchMoney, update: Update, context: Cont
 
 
 async def handle_dump_plaid_details(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sends a new message with the plaid metadata of the transaction."""
     query = update.callback_query
     transaction_id = int(query.data.split("_")[1])
 
@@ -68,6 +71,7 @@ async def handle_dump_plaid_details(lunch: LunchMoney, update: Update, context: 
 
 
 async def handle_mark_tx_as_reviewed(lunch: LunchMoney, update: Update):
+    """Updates the transaction status to reviewed."""
     query = update.callback_query
     transaction_id = int(query.data.split("_")[1])
     try:
@@ -77,7 +81,9 @@ async def handle_mark_tx_as_reviewed(lunch: LunchMoney, update: Update):
         await query.edit_message_text(text=f"Error updating transaction: {str(e)}")
 
 
+
 async def handle_set_tx_notes(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Updates the transaction notes."""
     replying_to_msg_id = update.message.reply_to_message.message_id
     tx_id = context.bot_data.get(replying_to_msg_id, None)
     if tx_id:
@@ -95,6 +101,7 @@ async def handle_set_tx_notes(lunch: LunchMoney, update: Update, context: Contex
 
 
 def get_default_budget(lunch: LunchMoney):
+    """Get the budget for the current month."""
     # get a datetime of the first day of the current month
     first_day_current_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     # get a datetime of the current day
@@ -105,33 +112,37 @@ def get_default_budget(lunch: LunchMoney):
 
 
 async def handle_show_budget(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sends a message with the current budget."""
     budget = get_default_budget(lunch)
     await send_budget(update, context, budget)
 
 
 
 async def handle_show_budget_categories(lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Updates the message to show the budget categories available."""
     budget = get_default_budget(lunch)
     await show_budget_categories(update, context, budget)
 
 
 
 async def handle_hide_budget_categories(lunch: LunchMoney, update: Update):
+    """Updates the message to hide the budget categories."""
     budget = get_default_budget(lunch)
     await hide_budget_categories(update, budget)
 
 
 
 async def handle_show_budget_for_category(lunch: LunchMoney, update: Update, category_id: int):
-    budget = get_default_budget(lunch)
+    """Updates the message to show the budget for a specific category"""
+    all_budget = get_default_budget(lunch)
 
     # get super category
     category = lunch.get_category(category_id)
     children_categories_ids = [child.id for child in category.children]
 
     sub_budget = []
-    for budget_item in budget:
+    for budget_item in all_budget:
         if budget_item.category_id in children_categories_ids:
             sub_budget.append(budget_item)
 
-    await show_bugdget_for_category(update, budget, sub_budget)
+    await show_bugdget_for_category(update, all_budget, sub_budget)
