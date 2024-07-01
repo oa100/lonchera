@@ -11,6 +11,7 @@ from budget_messaging import (
     show_budget_categories,
     show_bugdget_for_category,
 )
+from persistence import Persistence
 from tx_messaging import send_plaid_details, send_transaction_message
 
 logger = logging.getLogger("handlers")
@@ -131,11 +132,14 @@ async def handle_mark_tx_as_reviewed(lunch: LunchMoney, update: Update):
 
 
 async def handle_set_tx_notes_or_tags(
-    lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    lunch: LunchMoney,
+    db: Persistence,
 ):
     """Updates the transaction notes."""
     replying_to_msg_id = update.message.reply_to_message.message_id
-    tx_id = context.bot_data.get(replying_to_msg_id, None)
+    tx_id = db.get_tx_associated_with(replying_to_msg_id)
 
     if tx_id is None:
         logger.error("No transaction ID found in bot data")

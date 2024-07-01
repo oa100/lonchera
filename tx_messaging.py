@@ -48,7 +48,7 @@ async def send_transaction_message(
     transaction: TransactionObject,
     chat_id,
     message_id=None,
-) -> None:
+) -> int:
     """Sends a message to the chat_id with the details of a transaction. If message_id is provided, edits the existing"""
     # Get the datetime from plaid_metadata
     authorized_datetime = transaction.plaid_metadata.get("authorized_datetime")
@@ -109,6 +109,7 @@ async def send_transaction_message(
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=keyboard,
         )
+        return message_id
     else:
         # send a new message
         logger.info(f"Sending message to chat_id {chat_id}: {message}")
@@ -118,8 +119,7 @@ async def send_transaction_message(
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=keyboard,
         )
-        context.bot_data[msg.id] = transaction.id
-        logger.info(f"Current bot data: {context.bot_data}")
+        return msg.id
 
 
 async def send_plaid_details(

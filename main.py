@@ -29,6 +29,7 @@ from handlers import (
     handle_show_categories,
     handle_show_subcategories,
 )
+from persistence import Persistence
 from tx_messaging import get_tx_buttons, send_transaction_message
 
 logging.basicConfig(
@@ -39,7 +40,8 @@ logger = logging.getLogger("lonchera")
 httpx_logger = logging.getLogger("httpx")
 httpx_logger.setLevel(logging.WARNING)
 
-already_sent_transactions: List[int] = []
+db_path = "transactions.db"
+db = Persistence(db_path)
 
 
 def setup_handlers(config):
@@ -49,7 +51,7 @@ def setup_handlers(config):
 
     async def start(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(
-            "Bot started. Use /check_transactions to fetch unreviewed transactions."
+            "Bot started. Will start polling for new transactions soon."
         )
 
     async def check_transactions_manual(
@@ -91,18 +93,21 @@ def setup_handlers(config):
         logger.info("Polling for new transactions...")
         if pending:
             transactions = lunch.get_transactions(pending=True)
+            logger.info(f"Found {len(transactions)} pending transactions")
             transactions = [
                 tx for tx in transactions if tx.is_pending == True and tx.notes == None
             ]
         else:
             transactions = lunch.get_transactions(status="uncleared", pending=pending)
 
+        logger.info(f"Found {len(transactions)} transactions (pending={pending})")
+
         for transaction in transactions:
-            if ignore_already_sent and transaction.id in already_sent_transactions:
+            if ignore_already_sent and db.already_sent(transaction.id):
                 logger.warn(f"Ignoring already sent transaction: {transaction.id}")
                 continue
-            already_sent_transactions.append(transaction.id)
-            await send_transaction_message(context, transaction, "378659027")
+            msg_id = await send_transaction_message(context, transaction, "378659027")
+            db.mark_as_sent(transaction.id, msg_id)
 
         return transactions
 
@@ -157,7 +162,7 @@ def setup_handlers(config):
         )
 
     async def handle_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await handle_set_tx_notes_or_tags(lunch, update, context)
+        await handle_set_tx_notes_or_tags(update, context, lunch, db)
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(
