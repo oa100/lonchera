@@ -7,30 +7,37 @@ from lunchable.models import BudgetObject
 
 from typing import List
 
-logger = logging.getLogger('messaging')
+logger = logging.getLogger("messaging")
 
 
 def get_bugdet_buttons() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
+    return InlineKeyboardMarkup(
         [
-            InlineKeyboardButton("Details", callback_data="showBudgetCategories"),
+            [
+                InlineKeyboardButton("Details", callback_data="showBudgetCategories"),
+            ]
         ]
-    ])
+    )
 
 
-
-def get_budget_category_buttons(budget_items: List[BudgetObject]) -> InlineKeyboardMarkup:
+def get_budget_category_buttons(
+    budget_items: List[BudgetObject],
+) -> InlineKeyboardMarkup:
     buttons = []
     for budget_item in budget_items:
-        buttons.append(InlineKeyboardButton(budget_item.category_name, callback_data=f"showBudgetDetails_{budget_item.category_id}"))
+        buttons.append(
+            InlineKeyboardButton(
+                budget_item.category_name,
+                callback_data=f"showBudgetDetails_{budget_item.category_id}",
+            )
+        )
 
     # 3 buttons per row
-    buttons = [buttons[i:i + 3] for i in range(0, len(buttons), 3)]
+    buttons = [buttons[i : i + 3] for i in range(0, len(buttons), 3)]
 
     # add exit button
     buttons.append([InlineKeyboardButton("Exit", callback_data="exitBudgetDetails")])
     return InlineKeyboardMarkup(buttons)
-
 
 
 def build_budget_message(budget: List[BudgetObject]):
@@ -39,22 +46,25 @@ def build_budget_message(budget: List[BudgetObject]):
     total_spent = 0
     budget_date = next(iter(budget[0].data.keys()))
     for budget_item in budget:
-        if budget_item.category_group_name is None and budget_item.category_id is not None:
+        if (
+            budget_item.category_group_name is None
+            and budget_item.category_id is not None
+        ):
             _, budget_data = next(iter(budget_item.data.items()))
             spent_already = budget_data.spending_to_base
             budgeted = budget_data.budget_to_base
             total_budget += budgeted
             total_spent += spent_already
-            pct = spent_already*100/budgeted
+            pct = spent_already * 100 / budgeted
 
             # number of blocks to draw (max 10)
-            blocks = int(pct/10)
+            blocks = int(pct / 10)
             empty = 10 - blocks
-            bar = "█"*blocks + "░"*empty
+            bar = "█" * blocks + "░" * empty
             extra = ""
             if blocks > 10:
-                bar = "█"*10
-                extra = "▓"*(blocks-10)
+                bar = "█" * 10
+                extra = "▓" * (blocks - 10)
 
             # split the category group into two: the first emoji and the rest of the string
             emoji, cat_name = budget_item.category_name.split(" ", 1)
@@ -67,8 +77,9 @@ def build_budget_message(budget: List[BudgetObject]):
     return f"{msg}\n\nTotal spent: `{total_spent:.1f}` of `{total_budget:.1f}` {budget_data.budget_currency} (`{total_spent*100/total_budget:.1f}%`)"
 
 
-
-async def send_budget(update: Update, context: ContextTypes.DEFAULT_TYPE, budget: List[BudgetObject]) -> None:
+async def send_budget(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, budget: List[BudgetObject]
+) -> None:
     msg = build_budget_message(budget)
 
     if msg != "":
@@ -84,15 +95,21 @@ async def send_budget(update: Update, context: ContextTypes.DEFAULT_TYPE, budget
         pass
 
 
-async def show_budget_categories(update: Update, _: ContextTypes.DEFAULT_TYPE, budget: List[BudgetObject]) -> None:
+async def show_budget_categories(
+    update: Update, _: ContextTypes.DEFAULT_TYPE, budget: List[BudgetObject]
+) -> None:
     categories = []
     for budget_item in budget:
-        if budget_item.category_group_name is None and budget_item.category_id is not None:
+        if (
+            budget_item.category_group_name is None
+            and budget_item.category_id is not None
+        ):
             categories.append(budget_item)
 
     query = update.callback_query
-    await query.edit_message_reply_markup(reply_markup=get_budget_category_buttons(categories))
-
+    await query.edit_message_reply_markup(
+        reply_markup=get_budget_category_buttons(categories)
+    )
 
 
 async def hide_budget_categories(update: Update, budget: List[BudgetObject]) -> None:
@@ -105,8 +122,9 @@ async def hide_budget_categories(update: Update, budget: List[BudgetObject]) -> 
     )
 
 
-
-async def show_bugdget_for_category(update: Update, all_budget: List[BudgetObject], category_budget: List[BudgetObject]) -> None:
+async def show_bugdget_for_category(
+    update: Update, all_budget: List[BudgetObject], category_budget: List[BudgetObject]
+) -> None:
     msg = ""
     total_budget = 0
     total_spent = 0
@@ -125,16 +143,16 @@ async def show_bugdget_for_category(update: Update, all_budget: List[BudgetObjec
 
         total_budget += budgeted
         total_spent += spent_already
-        pct = spent_already*100/budgeted
+        pct = spent_already * 100 / budgeted
 
         # number of blocks to draw (max 10)
-        blocks = int(pct/10)
+        blocks = int(pct / 10)
         empty = 10 - blocks
-        bar = "█"*blocks + "░"*empty
+        bar = "█" * blocks + "░" * empty
         extra = ""
         if blocks > 10:
-            bar = "█"*10
-            extra = "▓"*(blocks-10)
+            bar = "█" * 10
+            extra = "▓" * (blocks - 10)
 
         msg += f"`[{bar}]{extra}`\n"
         msg += f"*{budget_item.category_name}* - `{spent_already:.1f}` of `{budgeted:.1f}` {budget_data.budget_currency} (`{pct:.1f}%`)\n"
@@ -156,9 +174,12 @@ async def show_bugdget_for_category(update: Update, all_budget: List[BudgetObjec
 
     categories = []
     for budget_item in all_budget:
-        if budget_item.category_group_name is None and budget_item.category_id is not None:
+        if (
+            budget_item.category_group_name is None
+            and budget_item.category_id is not None
+        ):
             categories.append(budget_item)
-    
+
     await update.callback_query.edit_message_text(
         text=msg,
         parse_mode=ParseMode.MARKDOWN,
