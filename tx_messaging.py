@@ -14,6 +14,7 @@ logger = logging.getLogger("messaging")
 def get_tx_buttons(
     transaction_id: int, plaid=True, skip=True, mark_reviewed=True, categorize=True
 ) -> InlineKeyboardMarkup:
+    """Returns a list of buttons to be displayed for a transaction."""
     buttons = []
     if categorize:
         buttons.append(
@@ -48,6 +49,7 @@ async def send_transaction_message(
     chat_id,
     message_id=None,
 ) -> None:
+    """Sends a message to the chat_id with the details of a transaction. If message_id is provided, edits the existing"""
     # Get the datetime from plaid_metadata
     authorized_datetime = transaction.plaid_metadata.get("authorized_datetime")
     if authorized_datetime:
@@ -127,6 +129,7 @@ async def send_plaid_details(
     transaction_id: str,
     plaid_details: str,
 ):
+    """Sends the plaid details of a transaction to the chat_id."""
     await context.bot.send_message(
         chat_id=chat_id,
         text=plaid_details,
