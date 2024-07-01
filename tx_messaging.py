@@ -79,8 +79,8 @@ async def send_transaction_message(
     message += f"*Payee:* {transaction.payee}\n"
     message += f"*Amount:* {transaction.amount:.2f}\n"
     message += f"*Date/Time:* {formatted_date_time}\n"
-    message += f"*Category:* #{category.title().replace(" ", " ")} \n"
-    message += f"*Account:* #{account_name.title().replace(" ", " ")}\n"
+    message += f"*Category:* #{category.title().replace(" ", '')} \n"
+    message += f"*Account:* #{account_name.title().replace(" ", '')}\n"
     if transaction.notes:
         message += f"*Notes:* {transaction.notes}\n"
     if transaction.tags:

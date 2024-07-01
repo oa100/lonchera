@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import logging
 import os
 from typing import List
@@ -87,18 +88,39 @@ def setup_handlers(config):
     async def get_budget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await handle_show_budget(lunch, update, context)
 
+    async def clear_cache(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        db.nuke()
+        await context.bot.set_message_reaction(
+            chat_id=update.message.chat_id,
+            message_id=update.message.message_id,
+            reaction=ReactionEmoji.THUMBS_UP,
+        )
+
     async def check_transactions_and_telegram_them(
         context: ContextTypes.DEFAULT_TYPE, pending=False, ignore_already_sent=True
     ) -> List[TransactionObject]:
-        logger.info("Polling for new transactions...")
+        # get date from 15 days ago
+        two_weeks_ago = datetime.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ) - timedelta(days=15)
+        now = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        logger.info(f"Polling for new transactions from {two_weeks_ago} to {now}...")
+
         if pending:
-            transactions = lunch.get_transactions(pending=True)
+            transactions = lunch.get_transactions(
+                pending=True, start_date=two_weeks_ago, end_date=now
+            )
             logger.info(f"Found {len(transactions)} pending transactions")
             transactions = [
                 tx for tx in transactions if tx.is_pending == True and tx.notes == None
             ]
         else:
-            transactions = lunch.get_transactions(status="uncleared", pending=pending)
+            transactions = lunch.get_transactions(
+                status="uncleared",
+                pending=pending,
+                start_date=two_weeks_ago,
+                end_date=now,
+            )
 
         logger.info(f"Found {len(transactions)} transactions (pending={pending})")
 
@@ -166,13 +188,14 @@ def setup_handlers(config):
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(
-        CommandHandler("check_transactions", check_transactions_manual)
+        CommandHandler("review_transactions", check_transactions_manual)
     )
     application.add_handler(
         CommandHandler("pending_transactions", check_pending_transactions)
     )
     application.add_handler(CommandHandler("refresh", trigger_plaid_refresh))
     application.add_handler(CommandHandler("show_budget", get_budget))
+    application.add_handler(CommandHandler("clear_cache", clear_cache))
     application.add_handler(CallbackQueryHandler(button_callback))
 
     job_queue = application.job_queue
@@ -206,4 +229,6 @@ if __name__ == "__main__":
     main()
 
 # TODO
-#      figure out persistent storage and multiplexing
+#      persistence should inlcude chat_id
+#      remove hardcoded chat_id
+#      allow specifying lunch money api key from bot

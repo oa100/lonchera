@@ -1,8 +1,17 @@
 import logging
 import sqlite3
 from typing import Optional
+from datetime import datetime
 
 logger = logging.getLogger("db")
+
+db_schema = """
+CREATE TABLE IF NOT EXISTS transactions (
+    message_id INTEGER PRIMARY KEY,
+    tx_id INTEGER NOT NULL,
+    timestamp TEXT NOT NULL
+)
+"""
 
 
 class Persistence:
@@ -18,9 +27,10 @@ class Persistence:
             """
             CREATE TABLE IF NOT EXISTS transactions (
                 message_id INTEGER PRIMARY KEY,
-                tx_id INTEGER NOT NULL
+                tx_id INTEGER NOT NULL,
+                timestamp TEXT NOT NULL
             )
-        """
+            """
         )
         conn.commit()
         conn.close()
@@ -40,9 +50,10 @@ class Persistence:
         logger.info(f"Marking transaction {tx_id} as sent with message ID {message_id}")
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
+        timestamp = datetime.now().isoformat()
         c.execute(
-            "INSERT INTO transactions (message_id, tx_id) VALUES (?, ?)",
-            (message_id, tx_id),
+            "INSERT INTO transactions (message_id, tx_id, timestamp) VALUES (?, ?, ?)",
+            (message_id, tx_id, timestamp),
         )
         conn.commit()
         conn.close()
@@ -55,3 +66,12 @@ class Persistence:
         result = c.fetchone()
         conn.close()
         return result[0] if result else None
+
+    def nuke(self):
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("DROP TABLE transactions")
+        c.execute(db_schema)
+        conn.commit()
+        conn.close()
+        logger.info("Database nuked")
