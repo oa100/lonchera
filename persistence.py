@@ -97,22 +97,21 @@ class Persistence:
         conn.close()
         return result[0] if result else None
 
-    def nuke(self):
+    def nuke(self, chat_id: int):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
-        c.execute("DROP TABLE transactions")
-        c.execute(db_schema)
+        c.execute("DELETE FROM transactions WHERE chat_id = ?", (chat_id,))
         conn.commit()
         conn.close()
-        logger.info("Database nuked")
+        logger.info(f"Transactions deleted for chat {chat_id}")
 
-    def mark_as_reviewed(self, message_id: int):
+    def mark_as_reviewed(self, message_id: int, chat_id: int):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         timestamp = datetime.now().isoformat()
         c.execute(
-            "UPDATE transactions SET reviewed_at = ? WHERE message_id = ?",
-            (timestamp, message_id),
+            "UPDATE transactions SET reviewed_at = ? WHERE message_id = ? AND chat_id = ?",
+            (timestamp, message_id, chat_id),
         )
         conn.commit()
         conn.close()

@@ -10,8 +10,6 @@ IMAGE_NAME="lonchera"
 # Full image name with version
 FULL_IMAGE_NAME="${IMAGE_NAME}:${VERSION}"
 
-docker rm "${IMAGE_NAME}" 2>/dev/null || true
-
 echo "Building Docker image: ${FULL_IMAGE_NAME}"
 
 # Build the Docker image
@@ -19,12 +17,15 @@ docker build -t "${FULL_IMAGE_NAME}" .
 
 echo "Docker image built successfully"
 
+echo "Stopping any existing container named ${IMAGE_NAME}"
+docker stop "${IMAGE_NAME}" || true
 
+docker rm "${IMAGE_NAME}" 2>/dev/null || true
 
 echo "Running Docker container as daemon"
 
 # Run the Docker container as a daemon
-docker run -d --name "${IMAGE_NAME}" "${FULL_IMAGE_NAME}"
+docker run -d -v /mnt/disco/k3s/lonchera/data/:/data -e DB_PATH=/data/lonchera.db --name "${IMAGE_NAME}" "${FULL_IMAGE_NAME}"
 
 echo "Docker container is now running as a daemon"
 
@@ -38,3 +39,6 @@ if [ -z "${CONTAINER_ID}" ]; then
   echo "Container is not running"
   exit 1
 fi
+
+# log the container output
+docker logs -f lonchera

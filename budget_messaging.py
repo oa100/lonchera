@@ -7,6 +7,8 @@ from lunchable.models import BudgetObject
 
 from typing import List
 
+from utils import make_tag
+
 logger = logging.getLogger("messaging")
 
 
@@ -68,10 +70,10 @@ def build_budget_message(budget: List[BudgetObject]):
 
             # split the category group into two: the first emoji and the rest of the string
             emoji, cat_name = budget_item.category_name.split(" ", 1)
-            cat_name = cat_name.title().replace(" ", "")
+            cat_name = make_tag(cat_name)
 
             msg += f"{emoji} `[{bar}]{extra}`\n"
-            msg += f"#*{cat_name}* - `{spent_already:.1f}` of `{budgeted:.1f}` {budget_data.budget_currency} (`{pct:.1f}%`)\n\n"
+            msg += f"{cat_name} - `{spent_already:.1f}` of `{budgeted:.1f}` {budget_data.budget_currency} (`{pct:.1f}%`)\n\n"
 
     msg = f"*Budget for {budget_date.strftime('%B %Y')}*\n\n{msg}"
     return f"{msg}\n\nTotal spent: `{total_spent:.1f}` of `{total_budget:.1f}` {budget_data.budget_currency} (`{total_spent*100/total_budget:.1f}%`)"
@@ -83,9 +85,8 @@ async def send_budget(
     msg = build_budget_message(budget)
 
     if msg != "":
-        chat_id = update.message.chat.id
         await context.bot.send_message(
-            chat_id=chat_id,
+            chat_id=update.message.chat_id,
             text=msg,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=get_bugdet_buttons(),

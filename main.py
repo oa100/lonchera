@@ -97,7 +97,7 @@ def setup_handlers(config):
         await handle_show_budget(update, context)
 
     async def clear_cache(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        get_db().nuke()
+        get_db().nuke(update.message.chat_id)
         await context.bot.set_message_reaction(
             chat_id=update.message.chat_id,
             message_id=update.message.message_id,
@@ -252,3 +252,6 @@ if __name__ == "__main__":
 
 # TODO
 #  List budget from last month
+#  docker compose file
+#  docker run should include volumes for db
+#  try to detect movements from one account to the other

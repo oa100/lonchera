@@ -8,6 +8,8 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from lunchable.models import TransactionObject
 
+from utils import make_tag
+
 
 logger = logging.getLogger("messaging")
 
@@ -70,7 +72,7 @@ async def send_transaction_message(
 
     # split the category group into two: the first emoji and the rest of the string
     emoji, rest = category_group.split(" ", 1)
-    rest = rest.title().replace(" ", "")
+    rest = make_tag(rest)
 
     recurring = ""
     if transaction.recurring_type:
@@ -81,14 +83,14 @@ async def send_transaction_message(
         # lunch money shows credits as negative
         # here I just want to denote that this was a credit by
         # explicitly showing a + sign before the amount
-        explicit_sign = "+"
+        explicit_sign = "➕"
 
     message = f"{emoji} #*{rest}* {recurring}\n\n"
     message += f"*Payee:* {transaction.payee}\n"
-    message += f"*Amount:* `{explicit_sign}{abs(transaction.amount):.2f}`{transaction.currency}\n"
+    message += f"*Amount:* `{explicit_sign}{abs(transaction.amount):.2f}``{transaction.currency}`\n"
     message += f"*Date/Time:* {formatted_date_time}\n"
-    message += f"*Category:* #{category.title().replace(" ", '')} \n"
-    message += f"*Account:* #{account_name.title().replace(" ", '')}\n"
+    message += f"*Category:* {make_tag(category)} \n"
+    message += f"*Account:* {make_tag(account_name)}\n"
     if transaction.notes:
         message += f"*Notes:* {transaction.notes}\n"
     if transaction.tags:

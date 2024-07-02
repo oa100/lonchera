@@ -168,9 +168,11 @@ async def handle_apply_category(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def handle_dump_plaid_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends a new message with the plaid metadata of the transaction."""
-    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     query = update.callback_query
     transaction_id = int(query.data.split("_")[1])
+
+    chat_id = query.message.chat.id
+    lunch = get_lunch_client_for_chat_id(chat_id)
 
     transaction = lunch.get_transaction(transaction_id)
     plaid_metadata = transaction.plaid_metadata
@@ -179,22 +181,24 @@ async def handle_dump_plaid_details(update: Update, context: ContextTypes.DEFAUL
         if value is not None:
             plaid_details += f"*{key}:* `{value}`\n"
 
-    chat_id = query.message.chat.id
     await send_plaid_details(query, context, chat_id, transaction_id, plaid_details)
 
 
 async def handle_mark_tx_as_reviewed(update: Update):
     """Updates the transaction status to reviewed."""
-    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     query = update.callback_query
+    chat_id = query.message.chat.id
+    lunch = get_lunch_client_for_chat_id(chat_id)
     transaction_id = int(query.data.split("_")[1])
     try:
         lunch.update_transaction(
             transaction_id, TransactionUpdateObject(status="cleared")
         )
-        await query.edit_message_reply_markup(
-            reply_markup=None
-        )  # Remove the inline keyboard (button)
+        # once the transaction is marked as reviewed, we remove the buttons
+        # to make it clear that the transaction was reviewed and no more changes
+        # are allowed (except adding notes or tags)
+        await query.edit_message_reply_markup(reply_markup=None)
+        get_db().mark_as_reviewed(query.message.message_id, chat_id)
     except Exception as e:
         await query.edit_message_text(text=f"Error updating transaction: {str(e)}")
 
@@ -262,21 +266,21 @@ async def handle_show_budget_categories(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ):
     """Updates the message to show the budget categories available."""
-    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
+    lunch = get_lunch_client_for_chat_id(update.callback_query.message.chat.id)
     budget = get_default_budget(lunch)
     await show_budget_categories(update, context, budget)
 
 
 async def handle_hide_budget_categories(update: Update):
     """Updates the message to hide the budget categories."""
-    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
+    lunch = get_lunch_client_for_chat_id(update.callback_query.message.chat.id)
     budget = get_default_budget(lunch)
     await hide_budget_categories(update, budget)
 
 
 async def handle_show_budget_for_category(update: Update, category_id: int):
     """Updates the message to show the budget for a specific category"""
-    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
+    lunch = get_lunch_client_for_chat_id(update.callback_query.message.chat.id)
     all_budget = get_default_budget(lunch)
 
     # get super category
