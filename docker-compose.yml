@@ -1,0 +1,9 @@
+services:
+  lonchera:
+    image: lonchera:20240702_0811
+    container_name: lonchera
+    environment:
+      - DB_PATH=/data/lonchera.db
+    volumes:
+      - /mnt/disco/k3s/lonchera/data/:/data
+    command: ["python", "main.py"]
