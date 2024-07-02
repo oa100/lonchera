@@ -213,7 +213,7 @@ async def handle_set_tx_notes_or_tags(
     tx_id = get_db().get_tx_associated_with(replying_to_msg_id, update.message.chat_id)
 
     if tx_id is None:
-        logger.error("No transaction ID found in bot data")
+        logger.error("No transaction ID found in bot data", exc_info=True)
         return
 
     msg_text = update.message.text

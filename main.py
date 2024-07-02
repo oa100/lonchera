@@ -125,7 +125,7 @@ def setup_handlers(config):
 
         for transaction in transactions:
             if get_db().already_sent(transaction.id):
-                logger.warn(f"Ignoring already sent transaction: {transaction.id}")
+                logger.warning(f"Ignoring already sent transaction: {transaction.id}")
                 continue
 
             # check if the current transaction is related to a previously sent one
@@ -183,7 +183,9 @@ def setup_handlers(config):
             try:
                 await check_transactions_and_telegram_them(context, chat_id=chat_id)
             except Exception as e:
-                logger.error(f"Failed to poll transactions for {chat_id}: {e}")
+                logger.error(
+                    f"Failed to poll transactions for {chat_id}: {e}", exc_info=True
+                )
 
     async def button_callback(
         update: Update, context: ContextTypes.DEFAULT_TYPE

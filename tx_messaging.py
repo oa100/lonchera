@@ -86,7 +86,7 @@ async def send_transaction_message(
         # explicitly showing a + sign before the amount
         explicit_sign = "➕"
 
-    message = f"{emoji} #*{rest}* {recurring}\n\n"
+    message = f"{emoji} *{rest}* {recurring}\n\n"
     message += f"*Payee:* {transaction.payee}\n"
     message += f"*Amount:* `{explicit_sign}{abs(transaction.amount):.2f}``{transaction.currency}`\n"
     message += f"*Date/Time:* {formatted_date_time}\n"
