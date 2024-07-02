@@ -210,7 +210,7 @@ async def handle_set_tx_notes_or_tags(
     """Updates the transaction notes."""
     lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     replying_to_msg_id = update.message.reply_to_message.message_id
-    tx_id = get_db().get_tx_associated_with(replying_to_msg_id)
+    tx_id = get_db().get_tx_associated_with(replying_to_msg_id, update.message.chat_id)
 
     if tx_id is None:
         logger.error("No transaction ID found in bot data")

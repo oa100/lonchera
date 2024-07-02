@@ -8,7 +8,7 @@ logger = logging.getLogger("db")
 
 db_schema = """
 CREATE TABLE IF NOT EXISTS transactions (
-    message_id INTEGER PRIMARY KEY,
+    message_id INTEGER NOT NULL,
     tx_id INTEGER NOT NULL,
     chat_id INTEGER NOT NULL,
     created_at TEXT NOT NULL,
@@ -89,10 +89,30 @@ class Persistence:
         conn.close()
 
     # Function to get the transaction ID associated with a specific message ID
-    def get_tx_associated_with(self, message_id: int) -> Optional[int]:
+    def get_tx_associated_with(self, message_id: int, chat_id: int) -> Optional[int]:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
-        c.execute("SELECT tx_id FROM transactions WHERE message_id = ?", (message_id,))
+        c.execute(
+            "SELECT tx_id FROM transactions WHERE message_id = ? AND chat_id = ?",
+            (
+                message_id,
+                chat_id,
+            ),
+        )
+        result = c.fetchone()
+        conn.close()
+        return result[0] if result else None
+
+    def get_message_id_associated_with(self, tx_id: int, chat_id: int) -> Optional[int]:
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute(
+            "SELECT message_id FROM transactions WHERE tx_id = ? AND chat_id = ?",
+            (
+                tx_id,
+                chat_id,
+            ),
+        )
         result = c.fetchone()
         conn.close()
         return result[0] if result else None

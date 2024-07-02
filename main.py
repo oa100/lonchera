@@ -34,6 +34,7 @@ from handlers import (
 from lunch import get_lunch_client_for_chat_id
 from persistence import get_db
 from tx_messaging import get_tx_buttons, send_transaction_message
+from utils import find_related_tx
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s"
@@ -71,11 +72,9 @@ def setup_handlers(config):
     async def check_pending_transactions(
         update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        transactions = await check_transactions_and_telegram_them(
+        transactions = await check_pending_transactions_and_telegram_them(
             context,
             chat_id=update.message.chat_id,
-            pending=True,
-            ignore_already_sent=False,
         )
 
         if not transactions:
@@ -105,10 +104,7 @@ def setup_handlers(config):
         )
 
     async def check_transactions_and_telegram_them(
-        context: ContextTypes.DEFAULT_TYPE,
-        chat_id: Union[str, int],
-        pending=False,
-        ignore_already_sent=True,
+        context: ContextTypes.DEFAULT_TYPE, chat_id: Union[str, int]
     ) -> List[TransactionObject]:
         # get date from 15 days ago
         two_weeks_ago = datetime.now().replace(
@@ -118,30 +114,63 @@ def setup_handlers(config):
         logger.info(f"Polling for new transactions from {two_weeks_ago} to {now}...")
 
         lunch = get_lunch_client_for_chat_id(chat_id)
-        if pending:
-            transactions = lunch.get_transactions(
-                pending=True, start_date=two_weeks_ago, end_date=now
-            )
-            logger.info(f"Found {len(transactions)} pending transactions")
-            transactions = [
-                tx for tx in transactions if tx.is_pending == True and tx.notes == None
-            ]
-        else:
-            transactions = lunch.get_transactions(
-                status="uncleared",
-                pending=pending,
-                start_date=two_weeks_ago,
-                end_date=now,
-            )
+        transactions = lunch.get_transactions(
+            status="uncleared",
+            pending=False,
+            start_date=two_weeks_ago,
+            end_date=now,
+        )
 
-        logger.info(f"Found {len(transactions)} transactions (pending={pending})")
+        logger.info(f"Found {len(transactions)} unreviewed transactions")
 
         for transaction in transactions:
-            if ignore_already_sent and get_db().already_sent(transaction.id):
+            if get_db().already_sent(transaction.id):
                 logger.warn(f"Ignoring already sent transaction: {transaction.id}")
                 continue
-            msg_id = await send_transaction_message(context, transaction, chat_id)
+
+            # check if the current transaction is related to a previously sent one
+            # like a payment to a credit card
+            related_tx = find_related_tx(transaction, transactions)
+            reply_msg_id = None
+            if related_tx:
+                logger.info(
+                    f"Found related transaction {related_tx.id} for {transaction.id}"
+                )
+                reply_msg_id = get_db().get_message_id_associated_with(
+                    related_tx.id, chat_id
+                )
+
+            msg_id = await send_transaction_message(
+                context, transaction, chat_id, reply_to_message_id=reply_msg_id
+            )
             get_db().mark_as_sent(transaction.id, chat_id, msg_id)
+
+        return transactions
+
+    async def check_pending_transactions_and_telegram_them(
+        context: ContextTypes.DEFAULT_TYPE,
+        chat_id: Union[str, int],
+    ) -> List[TransactionObject]:
+        # get date from 15 days ago
+        two_weeks_ago = datetime.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ) - timedelta(days=15)
+        now = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        logger.info(f"Polling for new transactions from {two_weeks_ago} to {now}...")
+
+        lunch = get_lunch_client_for_chat_id(chat_id)
+        transactions = lunch.get_transactions(
+            pending=True, start_date=two_weeks_ago, end_date=now
+        )
+        logger.info(f"Found {len(transactions)} pending transactions")
+        transactions = [
+            tx for tx in transactions if tx.is_pending == True and tx.notes == None
+        ]
+
+        logger.info(f"Found {len(transactions)} pending transactions")
+
+        for transaction in transactions:
+            await send_transaction_message(context, transaction, chat_id)
 
         return transactions
 
@@ -150,7 +179,7 @@ def setup_handlers(config):
         if len(chat_ids) is None:
             logger.info("No chats registered yet")
 
-        for chat_id in chat_ids:
+        for (chat_id,) in chat_ids:
             try:
                 await check_transactions_and_telegram_them(context, chat_id=chat_id)
             except Exception as e:
@@ -253,5 +282,3 @@ if __name__ == "__main__":
 # TODO
 #  List budget from last month
 #  docker compose file
-#  docker run should include volumes for db
-#  try to detect movements from one account to the other

@@ -1,6 +1,6 @@
 from datetime import datetime
 import logging
-from typing import Union
+from typing import Optional, Union
 import pytz
 
 from telegram import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
@@ -50,7 +50,8 @@ async def send_transaction_message(
     context: ContextTypes.DEFAULT_TYPE,
     transaction: TransactionObject,
     chat_id: Union[str, int],
-    message_id=None,
+    message_id: Optional[int] = None,
+    reply_to_message_id: Optional[int] = None,
 ) -> int:
     """Sends a message to the chat_id with the details of a transaction. If message_id is provided, edits the existing"""
     # Get the datetime from plaid_metadata
@@ -128,6 +129,7 @@ async def send_transaction_message(
             text=message,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=keyboard,
+            reply_to_message_id=reply_to_message_id,
         )
         return msg.id
 
