@@ -1,9 +1,11 @@
 from datetime import datetime
 import logging
+from textwrap import dedent
 from lunchable import LunchMoney, TransactionUpdateObject
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
-from telegram.constants import ReactionEmoji
+from telegram.constants import ReactionEmoji, ParseMode
+from persistence import get_db
 
 from budget_messaging import (
     hide_budget_categories,
@@ -11,14 +13,80 @@ from budget_messaging import (
     show_budget_categories,
     show_bugdget_for_category,
 )
-from persistence import Persistence
+from lunch import get_lunch_client, get_lunch_client_for_chat_id
 from tx_messaging import send_plaid_details, send_transaction_message
 
 logger = logging.getLogger("handlers")
 
 
-async def handle_show_categories(lunch: LunchMoney, update: Update):
+async def handle_start(update: Update):
+    await update.message.reply_text(
+        text=dedent(
+            """
+            Welcome to Lonchera! A Telegram bot that helps you stay on top of your Lunch Money transactions.
+            To start, please register your [Lunch Money API token](https://my.lunchmoney.app/developers) by sending:
+            
+            ```
+            /register <token>
+            ```
+
+            Only one token is supported per chat.
+            """
+        ),
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True,
+    )
+
+
+async def handle_register_token(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    token = update.message.text.split(" ")[1]
+
+    # delete the message with the token
+    await context.bot.delete_message(
+        chat_id=update.message.chat_id, message_id=update.message.message_id
+    )
+    await context.bot.send_message(
+        chat_id=update.message.chat_id,
+        text="Deleted token for security purposes",
+    )
+
+    # make sure the token is valid
+    lunch = get_lunch_client(token)
+
+    try:
+        lunch_user = lunch.get_user()
+        get_db().save_token(update.message.chat_id, token)
+
+        # TODO include basic docs of the available commands
+        await context.bot.send_message(
+            chat_id=update.message.chat_id,
+            text=dedent(
+                f"""
+                Hello {lunch_user.user_name}!
+
+                Your token was successfully registered. Will start polling for unreviewed transactions.
+                """
+            ),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    except Exception as e:
+        await context.bot.send_message(
+            chat_id=update.message.chat_id,
+            text=dedent(
+                f"""
+                Failed to register token:
+                ```
+                {e}
+                ```
+                """
+            ),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+
+async def handle_show_categories(update: Update):
     """Updates the message to show the parent categories available"""
+    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     query = update.callback_query
     transaction_id = int(query.data.split("_")[1])
 
@@ -50,6 +118,7 @@ async def handle_show_categories(lunch: LunchMoney, update: Update):
 
 async def handle_show_subcategories(lunch: LunchMoney, update: Update):
     """Updates the transaction with the selected category."""
+    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     query = update.callback_query
     transaction_id, category_id = query.data.split("_")[1:]
 
@@ -79,10 +148,9 @@ async def handle_show_subcategories(lunch: LunchMoney, update: Update):
     )
 
 
-async def handle_apply_category(
-    lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE
-):
+async def handle_apply_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Updates the transaction with the selected category."""
+    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     query = update.callback_query
     chat_id = query.message.chat.id
 
@@ -98,10 +166,9 @@ async def handle_apply_category(
     )
 
 
-async def handle_dump_plaid_details(
-    lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE
-):
+async def handle_dump_plaid_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends a new message with the plaid metadata of the transaction."""
+    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     query = update.callback_query
     transaction_id = int(query.data.split("_")[1])
 
@@ -116,8 +183,9 @@ async def handle_dump_plaid_details(
     await send_plaid_details(query, context, chat_id, transaction_id, plaid_details)
 
 
-async def handle_mark_tx_as_reviewed(lunch: LunchMoney, update: Update):
+async def handle_mark_tx_as_reviewed(update: Update):
     """Updates the transaction status to reviewed."""
+    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     query = update.callback_query
     transaction_id = int(query.data.split("_")[1])
     try:
@@ -134,12 +202,11 @@ async def handle_mark_tx_as_reviewed(lunch: LunchMoney, update: Update):
 async def handle_set_tx_notes_or_tags(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    lunch: LunchMoney,
-    db: Persistence,
 ):
     """Updates the transaction notes."""
+    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     replying_to_msg_id = update.message.reply_to_message.message_id
-    tx_id = db.get_tx_associated_with(replying_to_msg_id)
+    tx_id = get_db().get_tx_associated_with(replying_to_msg_id)
 
     if tx_id is None:
         logger.error("No transaction ID found in bot data")
@@ -183,32 +250,33 @@ def get_default_budget(lunch: LunchMoney):
     return lunch.get_budgets(start_date=first_day_current_month, end_date=current_day)
 
 
-async def handle_show_budget(
-    lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE
-):
+async def handle_show_budget(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends a message with the current budget."""
+    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
+    logger.info("Pulling budget...")
     budget = get_default_budget(lunch)
     await send_budget(update, context, budget)
 
 
 async def handle_show_budget_categories(
-    lunch: LunchMoney, update: Update, context: ContextTypes.DEFAULT_TYPE
+    update: Update, context: ContextTypes.DEFAULT_TYPE
 ):
     """Updates the message to show the budget categories available."""
+    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     budget = get_default_budget(lunch)
     await show_budget_categories(update, context, budget)
 
 
-async def handle_hide_budget_categories(lunch: LunchMoney, update: Update):
+async def handle_hide_budget_categories(update: Update):
     """Updates the message to hide the budget categories."""
+    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     budget = get_default_budget(lunch)
     await hide_budget_categories(update, budget)
 
 
-async def handle_show_budget_for_category(
-    lunch: LunchMoney, update: Update, category_id: int
-):
+async def handle_show_budget_for_category(update: Update, category_id: int):
     """Updates the message to show the budget for a specific category"""
+    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     all_budget = get_default_budget(lunch)
 
     # get super category

@@ -1,5 +1,6 @@
 from datetime import datetime
 import logging
+from typing import Union
 import pytz
 
 from telegram import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
@@ -46,7 +47,7 @@ def get_tx_buttons(
 async def send_transaction_message(
     context: ContextTypes.DEFAULT_TYPE,
     transaction: TransactionObject,
-    chat_id,
+    chat_id: Union[str, int],
     message_id=None,
 ) -> int:
     """Sends a message to the chat_id with the details of a transaction. If message_id is provided, edits the existing"""
@@ -75,9 +76,16 @@ async def send_transaction_message(
     if transaction.recurring_type:
         recurring = "(recurring 🔄)"
 
+    explicit_sign = ""
+    if transaction.amount < 0:
+        # lunch money shows credits as negative
+        # here I just want to denote that this was a credit by
+        # explicitly showing a + sign before the amount
+        explicit_sign = "+"
+
     message = f"{emoji} #*{rest}* {recurring}\n\n"
     message += f"*Payee:* {transaction.payee}\n"
-    message += f"*Amount:* {transaction.amount:.2f}\n"
+    message += f"*Amount:* `{explicit_sign}{abs(transaction.amount):.2f}`{transaction.currency}\n"
     message += f"*Date/Time:* {formatted_date_time}\n"
     message += f"*Category:* #{category.title().replace(" ", '')} \n"
     message += f"*Account:* #{account_name.title().replace(" ", '')}\n"

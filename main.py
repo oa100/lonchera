@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import logging
 import os
-from typing import List
+from typing import List, Union
 
 from dotenv import load_dotenv
 from telegram import Update
@@ -15,13 +15,13 @@ from telegram.ext import (
 )
 from telegram.constants import ReactionEmoji
 
-from lunchable import LunchMoney
 from lunchable.models import TransactionObject
 
 from handlers import (
     handle_apply_category,
     handle_dump_plaid_details,
     handle_hide_budget_categories,
+    handle_register_token,
     handle_show_budget,
     handle_show_budget_categories,
     handle_show_budget_for_category,
@@ -29,8 +29,10 @@ from handlers import (
     handle_set_tx_notes_or_tags,
     handle_show_categories,
     handle_show_subcategories,
+    handle_start,
 )
-from persistence import Persistence
+from lunch import get_lunch_client_for_chat_id
+from persistence import get_db
 from tx_messaging import get_tx_buttons, send_transaction_message
 
 logging.basicConfig(
@@ -41,24 +43,26 @@ logger = logging.getLogger("lonchera")
 httpx_logger = logging.getLogger("httpx")
 httpx_logger.setLevel(logging.WARNING)
 
-db_path = "transactions.db"
-db = Persistence(db_path)
-
 
 def setup_handlers(config):
     application = Application.builder().token(config["TELEGRAM_BOT_TOKEN"]).build()
 
-    lunch = LunchMoney(access_token=config["LUNCH_MONEY_TOKEN"])
+    # lunch = LunchMoney(access_token=config["LUNCH_MONEY_TOKEN"])
 
     async def start(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-        await update.message.reply_text(
-            "Bot started. Will start polling for new transactions soon."
-        )
+        await handle_start(update)
+
+    async def register_token(
+        update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        await handle_register_token(update, context)
 
     async def check_transactions_manual(
         update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        transactions = await check_transactions_and_telegram_them(context)
+        transactions = await check_transactions_and_telegram_them(
+            context, chat_id=update.message.chat_id
+        )
 
         if not transactions:
             await update.message.reply_text("No unreviewed transactions found.")
@@ -68,7 +72,10 @@ def setup_handlers(config):
         update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
         transactions = await check_transactions_and_telegram_them(
-            context, pending=True, ignore_already_sent=False
+            context,
+            chat_id=update.message.chat_id,
+            pending=True,
+            ignore_already_sent=False,
         )
 
         if not transactions:
@@ -78,6 +85,7 @@ def setup_handlers(config):
     async def trigger_plaid_refresh(
         update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
+        lunch = get_lunch_client_for_chat_id(update.message.chat_id)
         lunch.trigger_fetch_from_plaid()
         await context.bot.set_message_reaction(
             chat_id=update.message.chat_id,
@@ -86,10 +94,10 @@ def setup_handlers(config):
         )
 
     async def get_budget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        await handle_show_budget(lunch, update, context)
+        await handle_show_budget(update, context)
 
     async def clear_cache(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        db.nuke()
+        get_db().nuke()
         await context.bot.set_message_reaction(
             chat_id=update.message.chat_id,
             message_id=update.message.message_id,
@@ -97,7 +105,10 @@ def setup_handlers(config):
         )
 
     async def check_transactions_and_telegram_them(
-        context: ContextTypes.DEFAULT_TYPE, pending=False, ignore_already_sent=True
+        context: ContextTypes.DEFAULT_TYPE,
+        chat_id: Union[str, int],
+        pending=False,
+        ignore_already_sent=True,
     ) -> List[TransactionObject]:
         # get date from 15 days ago
         two_weeks_ago = datetime.now().replace(
@@ -106,6 +117,7 @@ def setup_handlers(config):
         now = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         logger.info(f"Polling for new transactions from {two_weeks_ago} to {now}...")
 
+        lunch = get_lunch_client_for_chat_id(chat_id)
         if pending:
             transactions = lunch.get_transactions(
                 pending=True, start_date=two_weeks_ago, end_date=now
@@ -125,13 +137,24 @@ def setup_handlers(config):
         logger.info(f"Found {len(transactions)} transactions (pending={pending})")
 
         for transaction in transactions:
-            if ignore_already_sent and db.already_sent(transaction.id):
+            if ignore_already_sent and get_db().already_sent(transaction.id):
                 logger.warn(f"Ignoring already sent transaction: {transaction.id}")
                 continue
-            msg_id = await send_transaction_message(context, transaction, "378659027")
-            db.mark_as_sent(transaction.id, msg_id)
+            msg_id = await send_transaction_message(context, transaction, chat_id)
+            get_db().mark_as_sent(transaction.id, chat_id, msg_id)
 
         return transactions
+
+    async def poll_transactions_on_schedule(context: ContextTypes.DEFAULT_TYPE):
+        chat_ids = get_db().get_all_registered_chats()
+        if len(chat_ids) is None:
+            logger.info("No chats registered yet")
+
+        for chat_id in chat_ids:
+            try:
+                await check_transactions_and_telegram_them(context, chat_id=chat_id)
+            except Exception as e:
+                logger.error(f"Failed to poll transactions for {chat_id}: {e}")
 
     async def button_callback(
         update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -147,14 +170,14 @@ def setup_handlers(config):
             return
 
         if query.data.startswith("showBudgetCategories"):
-            return await handle_show_budget_categories(lunch, update, context)
+            return await handle_show_budget_categories(update, context)
 
         if query.data.startswith("exitBudgetDetails"):
-            return await handle_hide_budget_categories(lunch, update)
+            return await handle_hide_budget_categories(update)
 
         if query.data.startswith("showBudgetDetails"):
             category_id = int(query.data.split("_")[1])
-            return await handle_show_budget_for_category(lunch, update, category_id)
+            return await handle_show_budget_for_category(update, category_id)
 
         transaction_id = int(query.data.split("_")[1])
 
@@ -165,28 +188,29 @@ def setup_handlers(config):
             return
 
         if query.data.startswith("categorize"):
-            return await handle_show_categories(lunch, update)
+            return await handle_show_categories(update)
 
         if query.data.startswith("subcategorize"):
-            return await handle_show_subcategories(lunch, update)
+            return await handle_show_subcategories(update)
 
         if query.data.startswith("applyCategory"):
-            return await handle_apply_category(lunch, update, context)
+            return await handle_apply_category(update, context)
 
         if query.data.startswith("plaid"):
-            return await handle_dump_plaid_details(lunch, update, context)
+            return await handle_dump_plaid_details(update, context)
 
         if query.data.startswith("review"):
-            return await handle_mark_tx_as_reviewed(lunch, update)
+            return await handle_mark_tx_as_reviewed(update)
 
         await context.bot.send_message(
             chat_id=chat_id, text=f"Unknown command {query.data}"
         )
 
     async def handle_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await handle_set_tx_notes_or_tags(update, context, lunch, db)
+        await handle_set_tx_notes_or_tags(update, context)
 
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("register", register_token))
     application.add_handler(
         CommandHandler("review_transactions", check_transactions_manual)
     )
@@ -199,9 +223,7 @@ def setup_handlers(config):
     application.add_handler(CallbackQueryHandler(button_callback))
 
     job_queue = application.job_queue
-    job_queue.run_repeating(
-        check_transactions_and_telegram_them, interval=1800, first=5
-    )
+    job_queue.run_repeating(poll_transactions_on_schedule, interval=1800, first=5)
 
     application.add_handler(MessageHandler(filters.TEXT & filters.REPLY, handle_reply))
 
@@ -229,6 +251,4 @@ if __name__ == "__main__":
     main()
 
 # TODO
-#      persistence should inlcude chat_id
-#      remove hardcoded chat_id
-#      allow specifying lunch money api key from bot
+#  List budget from last month
