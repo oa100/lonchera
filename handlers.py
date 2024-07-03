@@ -86,8 +86,9 @@ async def handle_register_token(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def handle_show_categories(update: Update):
     """Updates the message to show the parent categories available"""
-    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     query = update.callback_query
+    chat_id = query.message.chat.id
+    lunch = get_lunch_client_for_chat_id(chat_id)
     transaction_id = int(query.data.split("_")[1])
 
     categories = lunch.get_categories()
@@ -116,12 +117,13 @@ async def handle_show_categories(update: Update):
     )
 
 
-async def handle_show_subcategories(lunch: LunchMoney, update: Update):
+async def handle_show_subcategories(update: Update):
     """Updates the transaction with the selected category."""
-    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     query = update.callback_query
     transaction_id, category_id = query.data.split("_")[1:]
 
+    chat_id = query.message.chat.id
+    lunch = get_lunch_client_for_chat_id(chat_id)
     subcategories = lunch.get_categories()
     subcategory_buttons = []
     for subcategory in subcategories:
@@ -150,11 +152,11 @@ async def handle_show_subcategories(lunch: LunchMoney, update: Update):
 
 async def handle_apply_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Updates the transaction with the selected category."""
-    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     query = update.callback_query
     chat_id = query.message.chat.id
 
     transaction_id, category_id = query.data.split("_")[1:]
+    lunch = get_lunch_client_for_chat_id(chat_id)
     lunch.update_transaction(
         transaction_id, TransactionUpdateObject(category_id=category_id)
     )
@@ -208,7 +210,6 @@ async def handle_set_tx_notes_or_tags(
     context: ContextTypes.DEFAULT_TYPE,
 ):
     """Updates the transaction notes."""
-    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     replying_to_msg_id = update.message.reply_to_message.message_id
     tx_id = get_db().get_tx_associated_with(replying_to_msg_id, update.message.chat_id)
 
@@ -223,6 +224,7 @@ async def handle_set_tx_notes_or_tags(
             message_are_tags = False
             break
 
+    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
     if message_are_tags:
         tags_without_hashtag = [
             tag[1:] for tag in msg_text.split(" ") if tag.startswith("#")
@@ -293,3 +295,44 @@ async def handle_show_budget_for_category(update: Update, category_id: int):
             sub_budget.append(budget_item)
 
     await show_bugdget_for_category(update, all_budget, sub_budget)
+
+
+async def handle_mark_unreviewed(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    replying_to_msg_id = update.message.reply_to_message.message_id
+    chat_id = update.message.chat_id
+    if replying_to_msg_id is None:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="/mark_unreviewed must be a reply to the tramsaction you want to mark as unreviewed",
+        )
+        return
+
+    transaction_id = get_db().get_tx_associated_with(replying_to_msg_id, chat_id)
+
+    if transaction_id is None:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="Could not find the transaction associated with the message. This is a bug if you have not wiped the state.",
+        )
+        return
+
+    logger.info(
+        f"Marking transaction {transaction_id} from message {replying_to_msg_id} as unreviewed"
+    )
+    lunch = get_lunch_client_for_chat_id(chat_id)
+    lunch.update_transaction(
+        transaction_id, TransactionUpdateObject(status="uncleared")
+    )
+
+    # update message to show the right buttons
+    updated_tx = lunch.get_transaction(transaction_id)
+    await send_transaction_message(
+        context, transaction=updated_tx, chat_id=chat_id, message_id=replying_to_msg_id
+    )
+
+    # add reaction to the command message
+    await context.bot.set_message_reaction(
+        chat_id=chat_id,
+        message_id=update.message.message_id,
+        reaction=ReactionEmoji.OK_HAND_SIGN,
+    )

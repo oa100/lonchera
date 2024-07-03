@@ -21,6 +21,7 @@ from handlers import (
     handle_apply_category,
     handle_dump_plaid_details,
     handle_hide_budget_categories,
+    handle_mark_unreviewed,
     handle_register_token,
     handle_show_budget,
     handle_show_budget_categories,
@@ -102,6 +103,11 @@ def setup_handlers(config):
             message_id=update.message.message_id,
             reaction=ReactionEmoji.THUMBS_UP,
         )
+
+    async def mark_unreviewed(
+        update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        await handle_mark_unreviewed(update, context)
 
     async def check_transactions_and_telegram_them(
         context: ContextTypes.DEFAULT_TYPE, chat_id: Union[str, int]
@@ -251,6 +257,7 @@ def setup_handlers(config):
     application.add_handler(CommandHandler("refresh", trigger_plaid_refresh))
     application.add_handler(CommandHandler("show_budget", get_budget))
     application.add_handler(CommandHandler("clear_cache", clear_cache))
+    application.add_handler(CommandHandler("mark_unreviewed", mark_unreviewed))
     application.add_handler(CallbackQueryHandler(button_callback))
 
     job_queue = application.job_queue
@@ -283,4 +290,3 @@ if __name__ == "__main__":
 
 # TODO
 #  List budget from last month
-#  docker compose file
