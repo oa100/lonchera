@@ -4,20 +4,10 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
+from handlers.expectations import EXPECTING_TOKEN, set_expectation
 from lunch import get_lunch_client
 from persistence import get_db
 from utils import get_chat_id
-
-EXPECTING_TOKEN = "token"
-current_expectation = {}
-
-
-def get_expectation(chat_id: int) -> Optional[str]:
-    return current_expectation.get(chat_id, None)
-
-
-def set_expectation(chat_id: int, expectation: str):
-    current_expectation[chat_id] = expectation
 
 
 async def handle_register_token(
@@ -29,10 +19,13 @@ async def handle_register_token(
             chat_id=update.message.chat_id,
             text="Please provide a token to register",
         )
-        current_expectation[get_chat_id(update)] = {
-            "expectation": EXPECTING_TOKEN,
-            "msg_id": msg.message_id,
-        }
+        set_expectation(
+            get_chat_id(update),
+            {
+                "expectation": EXPECTING_TOKEN,
+                "msg_id": msg.message_id,
+            },
+        )
         return
 
     if token_override is not None:
@@ -159,10 +152,13 @@ async def handle_set_token_from_button(update: Update, _: ContextTypes.DEFAULT_T
     msg = await update.callback_query.edit_message_text(
         text="Please provide a token to register",
     )
-    current_expectation[get_chat_id(update)] = {
-        "expectation": EXPECTING_TOKEN,
-        "msg_id": msg.message_id,
-    }
+    set_expectation(
+        get_chat_id(update),
+        {
+            "expectation": EXPECTING_TOKEN,
+            "msg_id": msg.message_id,
+        },
+    )
 
 
 async def handle_change_poll_interval(

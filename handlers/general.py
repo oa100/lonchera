@@ -7,6 +7,7 @@ from lunchable import LunchMoney, TransactionUpdateObject
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from telegram.constants import ReactionEmoji, ParseMode
+from handlers.settings import handle_register_token
 from persistence import get_db
 
 from budget_messaging import (
@@ -16,10 +17,9 @@ from budget_messaging import (
     show_bugdget_for_category,
 )
 from lunch import NoLunchToken, get_lunch_client_for_chat_id
-from settings import (
+from handlers.expectations import (
     EXPECTING_TOKEN,
     get_expectation,
-    handle_register_token,
     set_expectation,
 )
 from tx_messaging import send_plaid_details, send_transaction_message

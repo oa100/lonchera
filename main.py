@@ -17,14 +17,13 @@ from telegram.constants import ReactionEmoji
 
 from lunchable.models import TransactionObject
 
-from handlers import (
+from handlers.general import (
     handle_apply_category,
     handle_dump_plaid_details,
     handle_errors,
     handle_generic_message,
     handle_hide_budget_categories,
     handle_mark_unreviewed,
-    handle_register_token,
     handle_show_budget,
     handle_show_budget_categories,
     handle_show_budget_for_category,
@@ -36,9 +35,10 @@ from handlers import (
 )
 from lunch import get_lunch_client_for_chat_id
 from persistence import get_db
-from settings import (
+from handlers.settings import (
     handle_change_poll_interval,
     handle_done_settings,
+    handle_register_token,
     handle_set_token_from_button,
     handle_settings,
 )
@@ -336,4 +336,5 @@ if __name__ == "__main__":
 # - Delete all data
 #    maybe use the keyboard markup
 # Refactor settings logic into its own file
+# Move handlers to their own file, and all handlers to a handlers folder
 # Use: CallbackQueryHandler https://chatgpt.com/c/f9a7b05c-44a3-4a9b-8cf5-729edbc4685b
