@@ -1,10 +1,21 @@
 from typing import List, Optional
 from lunchable.models import TransactionObject
+import emoji
 
 
-def make_tag(t: str):
-    t = t.title().replace(" ", "").replace(".", "")
-    return f"#{t}"
+def is_emoji(char):
+    return char in emoji.EMOJI_DATA
+
+
+def make_tag(t: str, title=False):
+    tag = "".join([char for char in t if char not in emoji.EMOJI_DATA])
+    tag = tag.title().replace(" ", "").replace(".", "").strip()
+
+    emojis = "".join([char for char in t if char in emoji.EMOJI_DATA])
+    if title:
+        return f"{emojis} *#{tag}*"
+    else:
+        return f"{emojis} #{tag}"
 
 
 def find_related_tx(

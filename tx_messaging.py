@@ -71,10 +71,6 @@ async def send_transaction_message(
     # Get account display name
     account_name = transaction.plaid_account_display_name or "N/A"
 
-    # split the category group into two: the first emoji and the rest of the string
-    emoji, rest = category_group.split(" ", 1)
-    rest = make_tag(rest)
-
     recurring = ""
     if transaction.recurring_type:
         recurring = "(recurring 🔄)"
@@ -86,7 +82,7 @@ async def send_transaction_message(
         # explicitly showing a + sign before the amount
         explicit_sign = "➕"
 
-    message = f"{emoji} *{rest}* {recurring}\n\n"
+    message = f"{make_tag(category_group, title=True)} {recurring}\n\n"
     message += f"*Payee:* {transaction.payee}\n"
     message += f"*Amount:* `{explicit_sign}{abs(transaction.amount):.2f}``{transaction.currency}`\n"
     message += f"*Date/Time:* {formatted_date_time}\n"

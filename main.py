@@ -290,3 +290,6 @@ if __name__ == "__main__":
 
 # TODO
 #  List budget from last month
+# allow writing notes or setting tags for pending transactions
+#    (right now it is not possible because those are not persisted)
+#

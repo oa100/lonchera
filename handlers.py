@@ -298,15 +298,15 @@ async def handle_show_budget_for_category(update: Update, category_id: int):
 
 
 async def handle_mark_unreviewed(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    replying_to_msg_id = update.message.reply_to_message.message_id
     chat_id = update.message.chat_id
-    if replying_to_msg_id is None:
+    if update.message.reply_to_message is None:
         await context.bot.send_message(
             chat_id=chat_id,
             text="/mark_unreviewed must be a reply to the tramsaction you want to mark as unreviewed",
         )
         return
 
+    replying_to_msg_id = update.message.reply_to_message.message_id
     transaction_id = get_db().get_tx_associated_with(replying_to_msg_id, chat_id)
 
     if transaction_id is None:
