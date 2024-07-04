@@ -16,7 +16,13 @@ def get_lunch_client_for_chat_id(chat_id: int) -> LunchMoney:
 
     token = get_db().get_token(chat_id)
     if token is None:
-        raise Exception("No token registered for this chat")
+        raise NoLunchToken("No token registered for this chat")
 
     lunch_clients_cache[chat_id] = get_lunch_client(token)
     return lunch_clients_cache[chat_id]
+
+
+class NoLunchToken(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message

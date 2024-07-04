@@ -20,6 +20,7 @@ from lunchable.models import TransactionObject
 from handlers import (
     handle_apply_category,
     handle_dump_plaid_details,
+    handle_errors,
     handle_hide_budget_categories,
     handle_mark_unreviewed,
     handle_register_token,
@@ -261,6 +262,8 @@ def setup_handlers(config):
     application.add_handler(CommandHandler("mark_unreviewed", mark_unreviewed))
     application.add_handler(CallbackQueryHandler(button_callback))
 
+    application.add_error_handler(handle_errors)
+
     job_queue = application.job_queue
     job_queue.run_repeating(poll_transactions_on_schedule, interval=1800, first=5)
 
@@ -291,5 +294,8 @@ if __name__ == "__main__":
 
 # TODO
 #  List budget from last month
-# Detect when there is no token:
-#    No error handlers are registered, logging exception
+# Add settings command:
+# - Enable/disable automatic transaction polling
+# - Set polling interval
+# - Delete all data
+#    maybe use the keyboard markup

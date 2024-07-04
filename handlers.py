@@ -1,6 +1,8 @@
 from datetime import datetime
 import logging
+import os
 from textwrap import dedent
+import traceback
 from lunchable import LunchMoney, TransactionUpdateObject
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
@@ -13,7 +15,7 @@ from budget_messaging import (
     show_budget_categories,
     show_bugdget_for_category,
 )
-from lunch import get_lunch_client, get_lunch_client_for_chat_id
+from lunch import NoLunchToken, get_lunch_client, get_lunch_client_for_chat_id
 from tx_messaging import send_plaid_details, send_transaction_message
 
 logger = logging.getLogger("handlers")
@@ -26,9 +28,7 @@ async def handle_start(update: Update):
             Welcome to Lonchera! A Telegram bot that helps you stay on top of your Lunch Money transactions.
             To start, please register your [Lunch Money API token](https://my.lunchmoney.app/developers) by sending:
             
-            ```
-            /register <token>
-            ```
+            `/register <token>`
 
             Only one token is supported per chat.
             """
@@ -335,3 +335,37 @@ async def handle_mark_unreviewed(update: Update, context: ContextTypes.DEFAULT_T
         message_id=update.message.message_id,
         reaction=ReactionEmoji.OK_HAND_SIGN,
     )
+
+
+# TODO: detect when no token is present, and send a message to the user to register a token
+async def handle_errors(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Log Errors caused by Updates."""
+    if isinstance(context.error, NoLunchToken):
+        await update.message.reply_text(
+            text=dedent(
+                """
+                No token registered for this chat. Please register a token using:
+                `/register <token>`
+                """
+            ),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return
+    if os.environ.get("DEBUG"):
+        error = context.error
+        await update.message.reply_text(
+            text=dedent(
+                f"""
+                An error occurred:
+                ```
+                {''.join(traceback.format_exception(type(error), error, error.__traceback__))}
+                ```
+                """
+            ),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    else:
+        logger.error(
+            f"Update {update} caused error {context.error}",
+            exc_info=context.error,
+        )
