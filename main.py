@@ -19,15 +19,12 @@ from lunchable.models import TransactionObject
 
 from handlers import (
     handle_apply_category,
-    handle_change_poll_interval,
     handle_dump_plaid_details,
     handle_errors,
     handle_generic_message,
     handle_hide_budget_categories,
     handle_mark_unreviewed,
     handle_register_token,
-    handle_set_token_from_button,
-    handle_settings,
     handle_show_budget,
     handle_show_budget_categories,
     handle_show_budget_for_category,
@@ -39,6 +36,12 @@ from handlers import (
 )
 from lunch import get_lunch_client_for_chat_id
 from persistence import get_db
+from settings import (
+    handle_change_poll_interval,
+    handle_done_settings,
+    handle_set_token_from_button,
+    handle_settings,
+)
 from tx_messaging import get_tx_buttons, send_transaction_message
 from utils import find_related_tx
 
@@ -249,6 +252,9 @@ def setup_handlers(config):
         if query.data == "registerToken":
             return await handle_set_token_from_button(update, context)
 
+        if query.data == "doneSettings":
+            return await handle_done_settings(update, context)
+
         if query.data.startswith("cancelCategorization"):
             transaction_id = int(query.data.split("_")[1])
             await query.edit_message_reply_markup(
@@ -330,3 +336,4 @@ if __name__ == "__main__":
 # - Delete all data
 #    maybe use the keyboard markup
 # Refactor settings logic into its own file
+# Use: CallbackQueryHandler https://chatgpt.com/c/f9a7b05c-44a3-4a9b-8cf5-729edbc4685b
