@@ -1,6 +1,7 @@
 from typing import List, Optional
 from lunchable.models import TransactionObject
 import emoji
+from telegram import Update
 
 
 def is_emoji(char):
@@ -24,4 +25,14 @@ def find_related_tx(
     for t in txs:
         if t.amount == -tx.amount and (t.date == tx.date or t.payee == t.payee):
             return t
+    return None
+
+
+def get_chat_id(update: Update) -> Optional[int]:
+    if update.message:
+        return update.message.chat_id
+
+    if update.callback_query:
+        return update.callback_query.message.chat.id
+
     return None

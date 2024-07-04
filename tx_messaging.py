@@ -113,7 +113,7 @@ async def send_transaction_message(
             chat_id=chat_id,
             message_id=message_id,
             text=message,
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=keyboard,
         )
         return message_id
@@ -123,7 +123,7 @@ async def send_transaction_message(
         msg = await context.bot.send_message(
             chat_id=chat_id,
             text=message,
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=keyboard,
             reply_to_message_id=reply_to_message_id,
         )
@@ -141,7 +141,7 @@ async def send_plaid_details(
     await context.bot.send_message(
         chat_id=chat_id,
         text=plaid_details,
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=ParseMode.MARKDOWN_V2,
         reply_to_message_id=query.message.message_id,
     )
 

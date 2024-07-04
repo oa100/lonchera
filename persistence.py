@@ -16,10 +16,12 @@ CREATE TABLE IF NOT EXISTS transactions (
     reviewed_at TEXT
 );
 
-CREATE TABLE IF NOT EXISTS tokens (
+CREATE TABLE IF NOT EXISTS settings (
     chat_id INTEGER PRIMARY KEY,
     token TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    poll_interval_secs INTEGER DEFAULT 3600 NOT NULL,
+    created_at TEXT NOT NULL,
+    last_poll_at TEXT
 );
 """
 
@@ -44,17 +46,25 @@ class Persistence:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         timestamp = datetime.now().isoformat()
-        c.execute(
-            "INSERT INTO tokens (chat_id, token, created_at) VALUES (?, ?, ?)",
-            (chat_id, token, timestamp),
-        )
-        conn.commit()
+        # check if the chat_id already exists, if so, update the token
+        c.execute("SELECT 1 FROM settings WHERE chat_id = ?", (chat_id,))
+        result = c.fetchone()
+        if result:
+            c.execute(
+                "UPDATE settings SET token = ? WHERE chat_id = ?", (token, chat_id)
+            )
+        else:
+            c.execute(
+                "INSERT INTO settings (chat_id, token, created_at) VALUES (?, ?, ?)",
+                (chat_id, token, timestamp),
+            )
+            conn.commit()
         conn.close()
 
     def get_token(self, chat_id) -> Union[str, None]:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
-        c.execute("SELECT token FROM tokens WHERE chat_id = ?", (chat_id,))
+        c.execute("SELECT token FROM settings WHERE chat_id = ?", (chat_id,))
         result = c.fetchone()
         conn.close()
         return result[0] if result else None
@@ -62,7 +72,7 @@ class Persistence:
     def get_all_registered_chats(self) -> List[int]:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
-        c.execute("SELECT chat_id FROM tokens")
+        c.execute("SELECT chat_id FROM settings")
         result = c.fetchall()
         conn.close()
         return result
@@ -139,6 +149,42 @@ class Persistence:
         c.execute(
             "UPDATE transactions SET reviewed_at = ? WHERE message_id = ? AND chat_id = ?",
             (timestamp, message_id, chat_id),
+        )
+        conn.commit()
+        conn.close()
+
+    def get_current_settings(self, chat_id: int) -> Optional[dict]:
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT * FROM settings WHERE chat_id = ?", (chat_id,))
+        result = c.fetchone()
+        conn.close()
+        if result is None:
+            return None
+        return {
+            "chat_id": result[0],
+            "token": result[1],
+            "poll_interval_secs": result[2],
+            "created_at": result[3],
+            "last_poll_at": result[4],
+        }
+
+    def update_poll_interval(self, chat_id: int, interval: int) -> None:
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute(
+            "UPDATE settings SET poll_interval_secs = ? WHERE chat_id = ?",
+            (interval, chat_id),
+        )
+        conn.commit()
+        conn.close()
+
+    def update_last_poll_at(self, chat_id: int, timestamp: str) -> None:
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute(
+            "UPDATE settings SET last_poll_at = ? WHERE chat_id = ?",
+            (timestamp, chat_id),
         )
         conn.commit()
         conn.close()
