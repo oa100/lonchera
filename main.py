@@ -130,7 +130,7 @@ def setup_handlers(config):
         logger.info(f"Found {len(transactions)} unreviewed transactions")
 
         for transaction in transactions:
-            if get_db().already_sent(transaction.id):
+            if get_db().was_already_sent(transaction.id):
                 logger.warning(f"Ignoring already sent transaction: {transaction.id}")
                 continue
 
@@ -176,7 +176,8 @@ def setup_handlers(config):
         logger.info(f"Found {len(transactions)} pending transactions")
 
         for transaction in transactions:
-            await send_transaction_message(context, transaction, chat_id)
+            msg_id = await send_transaction_message(context, transaction, chat_id)
+            get_db().mark_as_sent(transaction.id, chat_id, msg_id, pending=True)
 
         return transactions
 
@@ -290,6 +291,5 @@ if __name__ == "__main__":
 
 # TODO
 #  List budget from last month
-# allow writing notes or setting tags for pending transactions
-#    (right now it is not possible because those are not persisted)
-#
+# Detect when there is no token:
+#    No error handlers are registered, logging exception

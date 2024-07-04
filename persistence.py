@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     message_id INTEGER NOT NULL,
     tx_id INTEGER NOT NULL,
     chat_id INTEGER NOT NULL,
+    pending BOOLEAN DEFAULT FALSE NOT NULL,
     created_at TEXT NOT NULL,
     reviewed_at TEXT
 );
@@ -67,23 +68,29 @@ class Persistence:
         return result
 
     # Function to check if a transaction ID has already been sent
-    def already_sent(self, tx_id: int) -> bool:
+    def was_already_sent(self, tx_id: int) -> bool:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
-        c.execute("SELECT 1 FROM transactions WHERE tx_id = ?", (tx_id,))
+        # select all rows where tx_id is equal to the tx_id,
+        # but ignore rows where pending is True
+        c.execute(
+            "SELECT 1 FROM transactions WHERE tx_id = ? AND pending = ?", (tx_id, False)
+        )
         result = c.fetchone()
         conn.close()
         return result is not None
 
     # Function to mark a transaction ID as sent with an associated message ID
-    def mark_as_sent(self, tx_id: int, chat_id: int, message_id: int) -> None:
+    def mark_as_sent(
+        self, tx_id: int, chat_id: int, message_id: int, pending=False
+    ) -> None:
         logger.info(f"Marking transaction {tx_id} as sent with message ID {message_id}")
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         timestamp = datetime.now().isoformat()
         c.execute(
-            "INSERT INTO transactions (message_id, tx_id, chat_id, created_at) VALUES (?, ?, ?, ?)",
-            (message_id, tx_id, chat_id, timestamp),
+            "INSERT INTO transactions (message_id, tx_id, chat_id, created_at, pending) VALUES (?, ?, ?, ?, ?)",
+            (message_id, tx_id, chat_id, timestamp, pending),
         )
         conn.commit()
         conn.close()
@@ -107,7 +114,7 @@ class Persistence:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         c.execute(
-            "SELECT message_id FROM transactions WHERE tx_id = ? AND chat_id = ?",
+            "SELECT message_id FROM transactions WHERE tx_id = ? AND chat_id = ? ORDER BY created_at DESC LIMIT 1",
             (
                 tx_id,
                 chat_id,

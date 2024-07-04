@@ -162,7 +162,6 @@ async def handle_apply_category(update: Update, context: ContextTypes.DEFAULT_TY
     )
     logger.info(f"Changing category for tx {transaction_id} to {category_id}")
     updated_transaction = lunch.get_transaction(transaction_id)
-    logger.info(f"Updated transaction: {updated_transaction}")
     await send_transaction_message(
         context, updated_transaction, chat_id, query.message.message_id
     )
