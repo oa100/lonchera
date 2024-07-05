@@ -4,7 +4,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
-from handlers.expectations import EXPECTING_TOKEN, set_expectation
+from expectations import EXPECTING_TOKEN, set_expectation
 from lunch import get_lunch_client
 from persistence import get_db
 from utils import get_chat_id
@@ -115,11 +115,11 @@ def get_settings_buttons() -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     "Change poll interval",
-                    callback_data=f"changePollInterval",
+                    callback_data="changePollInterval",
                 ),
                 InlineKeyboardButton(
                     "Change token",
-                    callback_data=f"registerToken",
+                    callback_data="registerToken",
                 ),
             ],
             [
@@ -181,29 +181,29 @@ async def handle_change_poll_interval(
                     [
                         InlineKeyboardButton(
                             "5 minutes",
-                            callback_data=f"changePollInterval_300",
+                            callback_data="changePollInterval_300",
                         ),
                         InlineKeyboardButton(
                             "30 minutes",
-                            callback_data=f"changePollInterval_1800",
+                            callback_data="changePollInterval_1800",
                         ),
                         InlineKeyboardButton(
                             "1 hour",
-                            callback_data=f"changePollInterval_3600",
+                            callback_data="changePollInterval_3600",
                         ),
                     ],
                     [
                         InlineKeyboardButton(
                             "4 hours",
-                            callback_data=f"changePollInterval_14400",
+                            callback_data="changePollInterval_14400",
                         ),
                         InlineKeyboardButton(
                             "24 hours",
-                            callback_data=f"changePollInterval_86400",
+                            callback_data="changePollInterval_86400",
                         ),
                         InlineKeyboardButton(
                             "Disable",
-                            callback_data=f"changePollInterval_0",
+                            callback_data="changePollInterval_0",
                         ),
                     ],
                     [

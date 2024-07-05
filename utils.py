@@ -28,11 +28,11 @@ def find_related_tx(
     return None
 
 
-def get_chat_id(update: Update) -> Optional[int]:
+def get_chat_id(update: Update) -> int:
     if update.message:
         return update.message.chat_id
 
     if update.callback_query:
         return update.callback_query.message.chat.id
 
-    return None
+    raise ValueError(f"Could not find chat_id in {update}")

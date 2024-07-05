@@ -1,9 +1,10 @@
+from typing import Dict
 from lunchable import LunchMoney
 
 from persistence import get_db
 
 
-lunch_clients_cache = {}
+lunch_clients_cache: Dict[int, LunchMoney] = {}
 
 
 def get_lunch_client(token: str) -> LunchMoney:

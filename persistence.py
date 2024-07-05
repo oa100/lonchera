@@ -75,7 +75,7 @@ class Persistence:
         c.execute("SELECT chat_id FROM settings")
         result = c.fetchall()
         conn.close()
-        return result
+        return [r[0] for r in result]
 
     # Function to check if a transaction ID has already been sent
     def was_already_sent(self, tx_id: int) -> bool:

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import logging
 import os
-from typing import List, Union
+from typing import List
 
 from dotenv import load_dotenv
 from telegram import Update
@@ -43,7 +43,7 @@ from handlers.settings import (
     handle_settings,
 )
 from tx_messaging import get_tx_buttons, send_transaction_message
-from utils import find_related_tx
+from utils import find_related_tx, get_chat_id
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s"
@@ -83,7 +83,7 @@ def setup_handlers(config):
     ) -> None:
         transactions = await check_pending_transactions_and_telegram_them(
             context,
-            chat_id=update.message.chat_id,
+            chat_id=get_chat_id(update),
         )
 
         if not transactions:
@@ -118,7 +118,7 @@ def setup_handlers(config):
         await handle_mark_unreviewed(update, context)
 
     async def check_transactions_and_telegram_them(
-        context: ContextTypes.DEFAULT_TYPE, chat_id: Union[str, int]
+        context: ContextTypes.DEFAULT_TYPE, chat_id: int
     ) -> List[TransactionObject]:
         # get date from 15 days ago
         two_weeks_ago = datetime.now().replace(
@@ -163,7 +163,7 @@ def setup_handlers(config):
 
     async def check_pending_transactions_and_telegram_them(
         context: ContextTypes.DEFAULT_TYPE,
-        chat_id: Union[str, int],
+        chat_id: int,
     ) -> List[TransactionObject]:
         # get date from 15 days ago
         two_weeks_ago = datetime.now().replace(
@@ -177,9 +177,7 @@ def setup_handlers(config):
             pending=True, start_date=two_weeks_ago, end_date=now
         )
         logger.info(f"Found {len(transactions)} pending transactions")
-        transactions = [
-            tx for tx in transactions if tx.is_pending == True and tx.notes == None
-        ]
+        transactions = [tx for tx in transactions if tx.is_pending and tx.notes is None]
 
         logger.info(f"Found {len(transactions)} pending transactions")
 
@@ -199,7 +197,7 @@ def setup_handlers(config):
         if len(chat_ids) is None:
             logger.info("No chats registered yet")
 
-        for (chat_id,) in chat_ids:
+        for chat_id in chat_ids:
             settings = get_db().get_current_settings(chat_id)
             if not settings:
                 logger.error(f"No settings found for chat {chat_id}!")
@@ -223,9 +221,7 @@ def setup_handlers(config):
                 await check_transactions_and_telegram_them(context, chat_id=chat_id)
                 get_db().update_last_poll_at(chat_id, datetime.now().isoformat())
 
-    async def button_callback(
-        update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         logger.info(f"Button pressed: {query.data}")
 

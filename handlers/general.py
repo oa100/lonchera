@@ -7,7 +7,7 @@ from lunchable import LunchMoney, TransactionUpdateObject
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from telegram.constants import ReactionEmoji, ParseMode
-from handlers.settings import handle_register_token
+from settings import handle_register_token
 from persistence import get_db
 
 from budget_messaging import (
@@ -17,7 +17,7 @@ from budget_messaging import (
     show_bugdget_for_category,
 )
 from lunch import NoLunchToken, get_lunch_client_for_chat_id
-from handlers.expectations import (
+from expectations import (
     EXPECTING_TOKEN,
     get_expectation,
     set_expectation,
@@ -34,7 +34,7 @@ async def handle_start(update: Update):
             """
             Welcome to Lonchera! A Telegram bot that helps you stay on top of your Lunch Money transactions.
             To start, please register your [Lunch Money API token](https://my.lunchmoney.app/developers) by sending:
-            
+
             `/register <token>`
 
             Only one token is supported per chat.
@@ -138,7 +138,7 @@ async def handle_dump_plaid_details(update: Update, context: ContextTypes.DEFAUL
 
     transaction = lunch.get_transaction(transaction_id)
     plaid_metadata = transaction.plaid_metadata
-    plaid_details = f"*Plaid Metadata*\n\n"
+    plaid_details = "*Plaid Metadata*\n\n"
     for key, value in plaid_metadata.items():
         if value is not None:
             plaid_details += f"*{key}:* `{value}`\n"
@@ -272,7 +272,12 @@ async def handle_mark_unreviewed(update: Update, context: ContextTypes.DEFAULT_T
     if transaction_id is None:
         await context.bot.send_message(
             chat_id=chat_id,
-            text="Could not find the transaction associated with the message. This is a bug if you have not wiped the state.",
+            text=dedent(
+                """
+                Could not find the transaction associated with the message.
+                This is a bug if you have not wiped the state.
+                """
+            ),
         )
         return
 
@@ -336,8 +341,8 @@ async def handle_errors(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_generic_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # if waiting for a token, register it
-    expectation = get_expectation(get_chat_id(update), None)
-    if expectation["expectation"] == EXPECTING_TOKEN:
+    expectation = get_expectation(get_chat_id(update))
+    if expectation and expectation["expectation"] == EXPECTING_TOKEN:
         set_expectation(get_chat_id(update), None)
 
         await context.bot.delete_message(

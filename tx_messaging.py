@@ -53,7 +53,8 @@ async def send_transaction_message(
     message_id: Optional[int] = None,
     reply_to_message_id: Optional[int] = None,
 ) -> int:
-    """Sends a message to the chat_id with the details of a transaction. If message_id is provided, edits the existing"""
+    """Sends a message to the chat_id with the details of a transaction.
+    If message_id is provided, edits the existing"""
     # Get the datetime from plaid_metadata
     authorized_datetime = transaction.plaid_metadata.get("authorized_datetime")
     if authorized_datetime:
@@ -83,18 +84,18 @@ async def send_transaction_message(
         explicit_sign = "➕"
 
     message = f"{make_tag(category_group, title=True)} {recurring}\n\n"
-    message += f"*Payee:* {transaction.payee}\n"
-    message += f"*Amount:* `{explicit_sign}{abs(transaction.amount):.2f}``{transaction.currency}`\n"
-    message += f"*Date/Time:* {formatted_date_time}\n"
-    message += f"*Category:* {make_tag(category)} \n"
-    message += f"*Account:* {make_tag(account_name)}\n"
+    message += f"*Payee*: {transaction.payee}\n"
+    message += f"*Amount*: `{explicit_sign}{abs(transaction.amount):.2f}``{transaction.currency}`\n"
+    message += f"*Date/Time*: {formatted_date_time}\n"
+    message += f"*Category*: {make_tag(category)} \n"
+    message += f"*Account*: {make_tag(account_name)}\n"
     if transaction.notes:
-        message += f"*Notes:* {transaction.notes}\n"
+        message += f"*Notes*: {transaction.notes}\n"
     if transaction.tags:
         tags = [f"#{tag.name}" for tag in transaction.tags]
-        message += f"*Tags:* {', '.join(tags)}\n"
+        message += f"*Tags*: {', '.join(tags)}\n"
     if transaction.is_pending:
-        message += f"\n_This is a pending transaction_\n"
+        message += "\n_This is a pending transaction_\n"
 
     # recurring transactions are not categorizable
     show_categorize = transaction.recurring_type is None
@@ -134,7 +135,7 @@ async def send_plaid_details(
     query: CallbackQuery,
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int,
-    transaction_id: str,
+    transaction_id: int,
     plaid_details: str,
 ):
     """Sends the plaid details of a transaction to the chat_id."""
