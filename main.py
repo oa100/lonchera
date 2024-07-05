@@ -17,32 +17,38 @@ from telegram.constants import ReactionEmoji
 
 from lunchable.models import TransactionObject
 
+from handlers.budget import (
+    handle_btn_hide_budget_categories,
+    handle_btn_show_budget_categories,
+    handle_btn_show_budget_for_category,
+    handle_show_budget,
+)
 from handlers.general import (
-    handle_apply_category,
-    handle_dump_plaid_details,
     handle_errors,
     handle_generic_message,
-    handle_hide_budget_categories,
-    handle_mark_unreviewed,
-    handle_show_budget,
-    handle_show_budget_categories,
-    handle_show_budget_for_category,
-    handle_mark_tx_as_reviewed,
-    handle_set_tx_notes_or_tags,
-    handle_show_categories,
-    handle_show_subcategories,
     handle_start,
+)
+from handlers.transactions import (
+    handle_btn_apply_category,
+    handle_btn_cancel_categorization,
+    handle_btn_dump_plaid_details,
+    handle_btn_mark_tx_as_reviewed,
+    handle_btn_show_categories,
+    handle_btn_show_subcategories,
+    handle_btn_skip_transaction,
+    handle_mark_unreviewed,
+    handle_set_tx_notes_or_tags,
 )
 from lunch import get_lunch_client_for_chat_id
 from persistence import get_db
 from handlers.settings import (
-    handle_change_poll_interval,
-    handle_done_settings,
+    handle_btn_change_poll_interval,
+    handle_btn_done_settings,
     handle_register_token,
-    handle_set_token_from_button,
+    handle_btn_set_token_from_button,
     handle_settings,
 )
-from tx_messaging import get_tx_buttons, send_transaction_message
+from tx_messaging import send_transaction_message
 from utils import find_related_tx, get_chat_id
 
 logging.basicConfig(
@@ -55,7 +61,7 @@ httpx_logger.setLevel(logging.WARNING)
 
 
 def setup_handlers(config):
-    application = Application.builder().token(config["TELEGRAM_BOT_TOKEN"]).build()
+    app = Application.builder().token(config["TELEGRAM_BOT_TOKEN"]).build()
 
     # lunch = LunchMoney(access_token=config["LUNCH_MONEY_TOKEN"])
 
@@ -221,91 +227,86 @@ def setup_handlers(config):
                 await check_transactions_and_telegram_them(context, chat_id=chat_id)
                 get_db().update_last_poll_at(chat_id, datetime.now().isoformat())
 
-    async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_unknown_btn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
-        logger.info(f"Button pressed: {query.data}")
-
-        chat_id = query.message.chat.id
-        await query.answer()
-
-        if query.data.startswith("skip"):
-            await query.edit_message_reply_markup(reply_markup=None)
-            return
-
-        if query.data.startswith("showBudgetCategories"):
-            return await handle_show_budget_categories(update, context)
-
-        if query.data.startswith("exitBudgetDetails"):
-            return await handle_hide_budget_categories(update)
-
-        if query.data.startswith("showBudgetDetails"):
-            category_id = int(query.data.split("_")[1])
-            return await handle_show_budget_for_category(update, category_id)
-
-        if query.data.startswith("changePollInterval"):
-            return await handle_change_poll_interval(update, context)
-
-        if query.data == "registerToken":
-            return await handle_set_token_from_button(update, context)
-
-        if query.data == "doneSettings":
-            return await handle_done_settings(update, context)
-
-        if query.data.startswith("cancelCategorization"):
-            transaction_id = int(query.data.split("_")[1])
-            await query.edit_message_reply_markup(
-                reply_markup=get_tx_buttons(transaction_id)
-            )
-            return
-
-        if query.data.startswith("categorize"):
-            return await handle_show_categories(update)
-
-        if query.data.startswith("subcategorize"):
-            return await handle_show_subcategories(update)
-
-        if query.data.startswith("applyCategory"):
-            return await handle_apply_category(update, context)
-
-        if query.data.startswith("plaid"):
-            return await handle_dump_plaid_details(update, context)
-
-        if query.data.startswith("review"):
-            return await handle_mark_tx_as_reviewed(update)
-
-        await context.bot.send_message(
-            chat_id=chat_id, text=f"Unknown command {query.data}"
-        )
+        await query.answer(text=f"Unknown command {query.data}", show_alert=True)
 
     async def handle_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_set_tx_notes_or_tags(update, context)
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("register", register_token))
-    application.add_handler(
-        CommandHandler("review_transactions", check_transactions_manual)
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("register", register_token))
+    app.add_handler(CommandHandler("review_transactions", check_transactions_manual))
+    app.add_handler(CommandHandler("pending_transactions", check_pending_transactions))
+    app.add_handler(CommandHandler("refresh", trigger_plaid_refresh))
+    app.add_handler(CommandHandler("show_budget", get_budget))
+    app.add_handler(CommandHandler("clear_cache", clear_cache))
+    app.add_handler(CommandHandler("mark_unreviewed", mark_unreviewed))
+    app.add_handler(CommandHandler("settings", handle_settings))
+    app.add_handler(
+        CallbackQueryHandler(handle_btn_skip_transaction, pattern=r"^skip$")
     )
-    application.add_handler(
-        CommandHandler("pending_transactions", check_pending_transactions)
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_btn_show_budget_categories, pattern=r"^showBudgetCategories$"
+        )
     )
-    application.add_handler(CommandHandler("refresh", trigger_plaid_refresh))
-    application.add_handler(CommandHandler("show_budget", get_budget))
-    application.add_handler(CommandHandler("clear_cache", clear_cache))
-    application.add_handler(CommandHandler("mark_unreviewed", mark_unreviewed))
-    application.add_handler(CommandHandler("settings", handle_settings))
-    application.add_handler(CallbackQueryHandler(button_callback))
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_btn_hide_budget_categories, pattern=r"^exitBudgetDetails$"
+        )
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_btn_show_budget_for_category, pattern=r"^showBudgetDetails_"
+        )
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_btn_change_poll_interval, pattern=r"^changePollInterval"
+        )
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_btn_set_token_from_button, pattern=r"^registerToken$"
+        )
+    )
+    app.add_handler(
+        CallbackQueryHandler(handle_btn_done_settings, pattern=r"^doneSettings$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_btn_cancel_categorization, pattern=r"^cancelCategorization_"
+        )
+    )
+    app.add_handler(
+        CallbackQueryHandler(handle_btn_show_categories, pattern=r"^categorize_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(handle_btn_show_subcategories, pattern=r"^subcategorize_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(handle_btn_apply_category, pattern=r"^applyCategory_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(handle_btn_dump_plaid_details, pattern=r"^plaid_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(handle_btn_mark_tx_as_reviewed, pattern=r"^review_")
+    )
+    app.add_handler(CallbackQueryHandler(handle_unknown_btn))
 
-    application.add_error_handler(handle_errors)
+    app.add_error_handler(handle_errors)
 
-    job_queue = application.job_queue
+    job_queue = app.job_queue
     job_queue.run_repeating(poll_transactions_on_schedule, interval=60, first=5)
 
-    application.add_handler(MessageHandler(filters.TEXT & filters.REPLY, handle_reply))
-    application.add_handler(MessageHandler(filters.TEXT, handle_generic_message))
+    app.add_handler(MessageHandler(filters.TEXT & filters.REPLY, handle_reply))
+    app.add_handler(MessageHandler(filters.TEXT, handle_generic_message))
 
     logger.info("Telegram handlers set up successfully")
 
-    return application
+    return app
 
 
 def load_config():
@@ -327,10 +328,8 @@ if __name__ == "__main__":
     main()
 
 # TODO
-#  List budget from last month
+# List budget from last month
 # Add settings command:
 # - Delete all data
 #    maybe use the keyboard markup
-# Refactor settings logic into its own file
-# Move handlers to their own file, and all handlers to a handlers folder
 # Use: CallbackQueryHandler https://chatgpt.com/c/f9a7b05c-44a3-4a9b-8cf5-729edbc4685b

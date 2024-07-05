@@ -148,7 +148,9 @@ async def handle_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def handle_set_token_from_button(update: Update, _: ContextTypes.DEFAULT_TYPE):
+async def handle_btn_set_token_from_button(
+    update: Update, _: ContextTypes.DEFAULT_TYPE
+):
     msg = await update.callback_query.edit_message_text(
         text="Please provide a token to register",
     )
@@ -161,7 +163,7 @@ async def handle_set_token_from_button(update: Update, _: ContextTypes.DEFAULT_T
     )
 
 
-async def handle_change_poll_interval(
+async def handle_btn_change_poll_interval(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ):
     """Changes the poll interval for the chat."""
@@ -217,7 +219,7 @@ async def handle_change_poll_interval(
         )
 
 
-async def handle_done_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_btn_done_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # delete message
     await context.bot.delete_message(
         chat_id=get_chat_id(update),
