@@ -91,7 +91,7 @@ async def send_budget(
         await context.bot.send_message(
             chat_id=update.message.chat_id,
             text=msg,
-            parse_mode=ParseMode.MARKDOWN_V2,
+            parse_mode=ParseMode.MARKDOWN,
             reply_markup=get_bugdet_buttons(),
         )
     else:
@@ -121,7 +121,7 @@ async def hide_budget_categories(update: Update, budget: List[BudgetObject]) -> 
     query = update.callback_query
     await query.edit_message_text(
         text=msg,
-        parse_mode=ParseMode.MARKDOWN_V2,
+        parse_mode=ParseMode.MARKDOWN,
         reply_markup=get_bugdet_buttons(),
     )
 
@@ -190,6 +190,6 @@ async def show_bugdget_for_category(
 
     await update.callback_query.edit_message_text(
         text=msg,
-        parse_mode=ParseMode.MARKDOWN_V2,
+        parse_mode=ParseMode.MARKDOWN,
         reply_markup=get_budget_category_buttons(categories),
     )

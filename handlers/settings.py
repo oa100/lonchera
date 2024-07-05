@@ -4,7 +4,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
-from expectations import EXPECTING_TOKEN, set_expectation
+from handlers.expectations import EXPECTING_TOKEN, set_expectation
 from lunch import get_lunch_client
 from persistence import get_db
 from utils import get_chat_id

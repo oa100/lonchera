@@ -7,7 +7,7 @@ from lunchable import LunchMoney, TransactionUpdateObject
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from telegram.constants import ReactionEmoji, ParseMode
-from settings import handle_register_token
+from handlers.settings import handle_register_token
 from persistence import get_db
 
 from budget_messaging import (
@@ -17,7 +17,7 @@ from budget_messaging import (
     show_bugdget_for_category,
 )
 from lunch import NoLunchToken, get_lunch_client_for_chat_id
-from expectations import (
+from handlers.expectations import (
     EXPECTING_TOKEN,
     get_expectation,
     set_expectation,
@@ -40,7 +40,7 @@ async def handle_start(update: Update):
             Only one token is supported per chat.
             """
         ),
-        parse_mode=ParseMode.MARKDOWN_V2,
+        parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True,
     )
 
@@ -306,6 +306,9 @@ async def handle_mark_unreviewed(update: Update, context: ContextTypes.DEFAULT_T
 # TODO: detect when no token is present, and send a message to the user to register a token
 async def handle_errors(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Log Errors caused by Updates."""
+    if update is None:
+        logger.error("Update is None", exc_info=context.error)
+        return
     if isinstance(context.error, NoLunchToken):
         await context.bot.send_message(
             chat_id=get_chat_id(update),
@@ -315,7 +318,7 @@ async def handle_errors(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 `/register <token>`
                 """
             ),
-            parse_mode=ParseMode.MARKDOWN_V2,
+            parse_mode=ParseMode.MARKDOWN,
         )
         return
     if os.environ.get("DEBUG"):
@@ -330,7 +333,7 @@ async def handle_errors(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ```
                 """
             ),
-            parse_mode=ParseMode.MARKDOWN_V2,
+            parse_mode=ParseMode.MARKDOWN,
         )
     else:
         logger.error(
