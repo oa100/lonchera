@@ -189,6 +189,20 @@ class Persistence:
         conn.commit()
         conn.close()
 
+    def logout(self, chat_id: int) -> None:
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute(
+            "DELETE FROM settings WHERE chat_id = ?",
+            (chat_id,),
+        )
+        c.execute(
+            "DELETE FROM transactions WHERE chat_id = ?",
+            (chat_id,),
+        )
+        conn.commit()
+        conn.close()
+
 
 db = None
 

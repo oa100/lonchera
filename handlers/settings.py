@@ -124,9 +124,13 @@ def get_settings_buttons() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
+                    "Log out",
+                    callback_data="logout",
+                ),
+                InlineKeyboardButton(
                     "Done",
                     callback_data="doneSettings",
-                )
+                ),
             ],
         ]
     )
@@ -225,3 +229,40 @@ async def handle_btn_done_settings(update: Update, context: ContextTypes.DEFAULT
         chat_id=get_chat_id(update),
         message_id=update.callback_query.message.message_id,
     )
+
+
+async def handle_logout(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    await update.callback_query.edit_message_text(
+        text=dedent(
+            """
+            This will remove the API token from the DB and delete all the cache associated with this chat.
+            You need to delete the chat history manually.
+
+            Do you want to proceed?
+            """
+        ),
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "Yes, delete my token", callback_data="logout_confirm"
+                    ),
+                    InlineKeyboardButton("Nevermind", callback_data="logout_cancel"),
+                ]
+            ]
+        ),
+    )
+
+
+async def handle_logout_confirm(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    get_db().logout(get_chat_id(update))
+
+    await update.callback_query.delete_message()
+    await update.callback_query.answer(
+        "Your API token has been removed, as well as the transaction history. It was a pleasure to serve you 🖖"
+    )
+
+
+async def handle_logout_cancel(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    await update.callback_query.answer()
+    await update.callback_query.delete_message()
