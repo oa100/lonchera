@@ -27,6 +27,7 @@ from handlers.general import (
     handle_errors,
     handle_generic_message,
     handle_start,
+    handle_trigger_plaid_refresh,
 )
 from handlers.transactions import (
     handle_btn_apply_category,
@@ -95,20 +96,6 @@ def setup_handlers(config):
         if not transactions:
             await update.message.reply_text("No pending transactions found.")
             return
-
-    async def trigger_plaid_refresh(
-        update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
-        lunch = get_lunch_client_for_chat_id(update.message.chat_id)
-        lunch.trigger_fetch_from_plaid()
-        await context.bot.set_message_reaction(
-            chat_id=update.message.chat_id,
-            message_id=update.message.message_id,
-            reaction=ReactionEmoji.HANDSHAKE,
-        )
-
-    async def get_budget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        await handle_show_budget(update, context)
 
     async def clear_cache(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         get_db().nuke(update.message.chat_id)
@@ -238,8 +225,8 @@ def setup_handlers(config):
     app.add_handler(CommandHandler("register", register_token))
     app.add_handler(CommandHandler("review_transactions", check_transactions_manual))
     app.add_handler(CommandHandler("pending_transactions", check_pending_transactions))
-    app.add_handler(CommandHandler("refresh", trigger_plaid_refresh))
-    app.add_handler(CommandHandler("show_budget", get_budget))
+    app.add_handler(CommandHandler("refresh", handle_trigger_plaid_refresh))
+    app.add_handler(CommandHandler("show_budget", handle_show_budget))
     app.add_handler(CommandHandler("clear_cache", clear_cache))
     app.add_handler(CommandHandler("mark_unreviewed", mark_unreviewed))
     app.add_handler(CommandHandler("settings", handle_settings))
@@ -248,12 +235,12 @@ def setup_handlers(config):
     )
     app.add_handler(
         CallbackQueryHandler(
-            handle_btn_show_budget_categories, pattern=r"^showBudgetCategories$"
+            handle_btn_show_budget_categories, pattern=r"^showBudgetCategories_"
         )
     )
     app.add_handler(
         CallbackQueryHandler(
-            handle_btn_hide_budget_categories, pattern=r"^exitBudgetDetails$"
+            handle_btn_hide_budget_categories, pattern=r"^exitBudgetDetails_"
         )
     )
     app.add_handler(
@@ -261,6 +248,7 @@ def setup_handlers(config):
             handle_btn_show_budget_for_category, pattern=r"^showBudgetDetails_"
         )
     )
+    app.add_handler(CallbackQueryHandler(handle_show_budget, pattern=r"^showBudget_"))
     app.add_handler(
         CallbackQueryHandler(
             handle_btn_change_poll_interval, pattern=r"^changePollInterval"
@@ -328,8 +316,6 @@ if __name__ == "__main__":
     main()
 
 # TODO
-# List budget from last month
 # Add settings command:
 # - Delete all data
 #    maybe use the keyboard markup
-# Use: CallbackQueryHandler https://chatgpt.com/c/f9a7b05c-44a3-4a9b-8cf5-729edbc4685b

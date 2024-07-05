@@ -6,8 +6,9 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from handlers.settings import handle_register_token
+from telegram.constants import ReactionEmoji
 
-from lunch import NoLunchToken
+from lunch import NoLunchToken, get_lunch_client_for_chat_id
 from handlers.expectations import (
     EXPECTING_TOKEN,
     get_expectation,
@@ -88,3 +89,15 @@ async def handle_generic_message(update: Update, context: ContextTypes.DEFAULT_T
         )
 
     logger.info(f"Received unexpected message: {update.message.text}")
+
+
+async def handle_trigger_plaid_refresh(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
+    lunch.trigger_fetch_from_plaid()
+    await context.bot.set_message_reaction(
+        chat_id=update.message.chat_id,
+        message_id=update.message.message_id,
+        reaction=ReactionEmoji.HANDSHAKE,
+    )
