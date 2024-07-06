@@ -3,14 +3,14 @@ import logging
 from typing import Optional, Union
 import pytz
 
-from telegram import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import CallbackQuery, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from lunchable.models import TransactionObject
 
 from lunch import get_lunch_client_for_chat_id
 from persistence import get_db
-from utils import make_tag
+from utils import Keyboard, make_tag
 
 
 logger = logging.getLogger("messaging")
@@ -21,8 +21,6 @@ def get_tx_buttons(
     collapsed=True,
 ) -> InlineKeyboardMarkup:
     """Returns a list of buttons to be displayed for a transaction."""
-    buttons = []
-
     # if transaction is an int, it's a transaction_id
     if isinstance(transaction, int):
         transaction_id = transaction
@@ -37,65 +35,35 @@ def get_tx_buttons(
         is_pending = transaction.is_pending
         is_reviewed = transaction.status == "cleared"
 
+    kbd = Keyboard()
     if collapsed:
-        buttons.append(
-            InlineKeyboardButton(
-                "More options", callback_data=f"moreOptions_{transaction_id}"
-            )
-        )
+        kbd += ("☷", f"moreOptions_{transaction_id}")
 
     # recurring transactions are not categorizable
     categorize = recurring_type is None
     if categorize and not collapsed:
-        buttons.append(
-            InlineKeyboardButton(
-                "Categorize", callback_data=f"categorize_{transaction_id}"
-            )
-        )
+        kbd += ("Categorize", f"categorize_{transaction_id}")
 
     if not collapsed:
-        buttons.append(
-            InlineKeyboardButton(
-                "Rename payee", callback_data=f"renamePayee_{transaction_id}"
-            )
-        )
-        buttons.append(
-            InlineKeyboardButton(
-                "Edit notes", callback_data=f"editNotes_{transaction_id}"
-            )
-        )
-        buttons.append(
-            InlineKeyboardButton("Set tags", callback_data=f"setTags_{transaction_id}")
-        )
-        buttons.append(
-            InlineKeyboardButton(
-                "Dump plaid details", callback_data=f"plaid_{transaction_id}"
-            )
-        )
+        kbd += ("Rename payee", f"renamePayee_{transaction_id}")
+        kbd += ("Edit notes", f"editNotes_{transaction_id}")
+        kbd += ("Set tags", f"setTags_{transaction_id}")
+        kbd += ("Dump plaid details", f"plaid_{transaction_id}")
 
-    skip = not is_pending
-    if skip and not collapsed and not is_reviewed:
-        buttons.append(
-            InlineKeyboardButton("Skip", callback_data=f"skip_{transaction_id}")
-        )
+        skip = not is_pending
+        if skip and not is_reviewed:
+            kbd += ("Skip", f"skip_{transaction_id}")
 
-    if is_reviewed:
-        if not collapsed:
-            buttons.append(
-                InlineKeyboardButton(
-                    "Mark as unreviewed", callback_data=f"unreview_{transaction_id}"
-                )
-            )
-    else:
-        buttons.append(
-            InlineKeyboardButton(
-                "Mark as reviewed", callback_data=f"review_{transaction_id}"
-            )
-        )
+        if is_reviewed:
+            kbd += ("Mark as unreviewed", f"unreview_{transaction_id}")
 
-    # max two buttons per row
-    buttons = [buttons[i : i + 2] for i in range(0, len(buttons), 2)]
-    return InlineKeyboardMarkup(buttons)
+    if not is_reviewed:
+        kbd += ("Mark as reviewed", f"review_{transaction_id}")
+
+    if not is_pending and not collapsed and is_reviewed:
+        kbd += ("⬒ Collapse", f"collapse_{transaction_id}")
+
+    return kbd.build()
 
 
 async def send_transaction_message(
@@ -119,7 +87,11 @@ async def send_transaction_message(
 
     # Get category and category group
     category = transaction.category_name or "Uncategorized"
-    category_group = transaction.category_group_name or "No Group"
+    category_group = transaction.category_group_name
+    if category is None:
+        category_group = "*No Group*"
+    else:
+        category_group = make_tag(category_group, title=True)
 
     # Get account display name
     account_name = transaction.plaid_account_display_name or "N/A"
@@ -135,7 +107,13 @@ async def send_transaction_message(
         # explicitly showing a + sign before the amount
         explicit_sign = "➕"
 
-    message = f"{make_tag(category_group, title=True)} {recurring}\n\n"
+    is_reviewed = transaction.status == "cleared"
+    if is_reviewed:
+        reviewed_watermark = "\u200B"
+    else:
+        reviewed_watermark = "\u200C"
+
+    message = f"{category_group} {reviewed_watermark} {recurring}\n\n"
     message += f"*Payee*: {transaction.payee}\n"
     message += f"*Amount*: `{explicit_sign}{abs(transaction.amount):.2f}``{transaction.currency}`\n"
     message += f"*Date/Time*: {formatted_date_time}\n"
@@ -149,6 +127,7 @@ async def send_transaction_message(
     if transaction.is_pending:
         message += "\n_This is a pending transaction_\n"
 
+    logger.info(f"Sending message to chat_id {chat_id}: {message}")
     if message_id:
         # edit existing message
         try:
@@ -166,8 +145,6 @@ async def send_transaction_message(
                 raise e
         return message_id
     else:
-        # send a new message
-        logger.info(f"Sending message to chat_id {chat_id}: {message}")
         msg = await context.bot.send_message(
             chat_id=chat_id,
             text=message,

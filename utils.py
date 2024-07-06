@@ -1,7 +1,7 @@
 from typing import List, Optional
 from lunchable.models import TransactionObject
 import emoji
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 
 
 def is_emoji(char):
@@ -36,3 +36,19 @@ def get_chat_id(update: Update) -> int:
         return update.callback_query.message.chat.id
 
     raise ValueError(f"Could not find chat_id in {update}")
+
+
+class Keyboard(list):
+    def __iadd__(self, other):
+        print(other)
+        self.append(other)
+        return self
+
+    def build(self, max_per_row: int = 2) -> InlineKeyboardMarkup:
+        buttons = [
+            InlineKeyboardButton(text, callback_data=data) for (text, data) in self
+        ]
+        buttons = [
+            buttons[i : i + max_per_row] for i in range(0, len(buttons), max_per_row)
+        ]
+        return InlineKeyboardMarkup(buttons)

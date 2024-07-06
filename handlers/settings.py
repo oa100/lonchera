@@ -55,7 +55,7 @@ async def handle_register_token(
 
                 Use /settings to change my behavior.
 
-                (_I deleted token you provided for security purposes_)
+                (_I deleted the message with the token you provided for security purposes_)
                 """
             ),
             parse_mode=ParseMode.MARKDOWN,

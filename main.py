@@ -30,6 +30,7 @@ from handlers.transactions import (
     check_pending_transactions,
     handle_btn_apply_category,
     handle_btn_cancel_categorization,
+    handle_btn_collapse_transaction,
     handle_btn_dump_plaid_details,
     handle_btn_mark_tx_as_reviewed,
     handle_btn_mark_tx_as_unreviewed,
@@ -95,6 +96,9 @@ def setup_handlers(config):
     app.add_handler(CommandHandler("settings", handle_settings))
     app.add_handler(
         CallbackQueryHandler(handle_btn_skip_transaction, pattern=r"^skip_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(handle_btn_collapse_transaction, pattern=r"^collapse_")
     )
     app.add_handler(
         CallbackQueryHandler(
