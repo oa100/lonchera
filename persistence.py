@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     chat_id INTEGER NOT NULL,
     pending BOOLEAN DEFAULT FALSE NOT NULL,
     created_at TEXT NOT NULL,
-    reviewed_at TEXT
+    reviewed_at TEXT,
+    recurring_type TEXT
 );
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -26,7 +27,6 @@ CREATE TABLE IF NOT EXISTS settings (
 """
 
 
-# TODO keep just one connection around
 class Persistence:
     def __init__(self, db_path: str):
         self.db_path = db_path
@@ -92,15 +92,24 @@ class Persistence:
 
     # Function to mark a transaction ID as sent with an associated message ID
     def mark_as_sent(
-        self, tx_id: int, chat_id: int, message_id: int, pending=False
+        self,
+        tx_id: int,
+        chat_id: int,
+        message_id: int,
+        recurring_type: Optional[str],
+        pending=False,
     ) -> None:
         logger.info(f"Marking transaction {tx_id} as sent with message ID {message_id}")
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         timestamp = datetime.now().isoformat()
         c.execute(
-            "INSERT INTO transactions (message_id, tx_id, chat_id, created_at, pending) VALUES (?, ?, ?, ?, ?)",
-            (message_id, tx_id, chat_id, timestamp, pending),
+            """
+            INSERT INTO transactions
+            (message_id, tx_id, chat_id, created_at, pending, recurring_type)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (message_id, tx_id, chat_id, timestamp, pending, recurring_type),
         )
         conn.commit()
         conn.close()
@@ -119,6 +128,17 @@ class Persistence:
         result = c.fetchone()
         conn.close()
         return result[0] if result else None
+
+    def get_tx_metadata(self, tx_id: int) -> Optional[tuple[str, bool, bool]]:
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute(
+            "SELECT recurring_type, pending, reviewed_at FROM transactions WHERE tx_id = ?",
+            (tx_id,),
+        )
+        result = c.fetchone()
+        conn.close()
+        return (result[0], result[1], result[2] is not None) if result else None
 
     def get_message_id_associated_with(self, tx_id: int, chat_id: int) -> Optional[int]:
         conn = sqlite3.connect(self.db_path)
@@ -149,6 +169,16 @@ class Persistence:
         c.execute(
             "UPDATE transactions SET reviewed_at = ? WHERE message_id = ? AND chat_id = ?",
             (timestamp, message_id, chat_id),
+        )
+        conn.commit()
+        conn.close()
+
+    def mark_as_unreviewed(self, message_id: int, chat_id: int):
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute(
+            "UPDATE transactions SET reviewed_at = NULL WHERE message_id = ? AND chat_id = ?",
+            (message_id, chat_id),
         )
         conn.commit()
         conn.close()

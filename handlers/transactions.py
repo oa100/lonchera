@@ -3,10 +3,17 @@ import logging
 from textwrap import dedent
 from typing import List
 from lunchable import TransactionUpdateObject
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
-from telegram.constants import ReactionEmoji
+from telegram.constants import ReactionEmoji, ParseMode
 
+from handlers.expectations import (
+    EDIT_NOTES,
+    RENAME_PAYEE,
+    SET_TAGS,
+    set_expectation,
+)
+from handlers.general import handle_generic_message
 from lunch import get_lunch_client_for_chat_id
 from lunchable.models import TransactionObject
 
@@ -57,7 +64,9 @@ async def check_transactions_and_telegram_them(
         msg_id = await send_transaction_message(
             context, transaction, chat_id, reply_to_message_id=reply_msg_id
         )
-        get_db().mark_as_sent(transaction.id, chat_id, msg_id)
+        get_db().mark_as_sent(
+            transaction.id, chat_id, msg_id, transaction.recurring_type
+        )
 
     return transactions
 
@@ -84,7 +93,9 @@ async def check_pending_transactions_and_telegram_them(
 
     for transaction in transactions:
         msg_id = await send_transaction_message(context, transaction, chat_id)
-        get_db().mark_as_sent(transaction.id, chat_id, msg_id, pending=True)
+        get_db().mark_as_sent(
+            transaction.id, chat_id, msg_id, transaction.recurring_type, pending=True
+        )
 
     return transactions
 
@@ -114,16 +125,16 @@ async def check_pending_transactions(
     return
 
 
-async def handle_btn_skip_transaction(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-):
-    query = update.callback_query
-    await query.edit_message_reply_markup(reply_markup=None)
-    await query.answer()
+async def handle_btn_skip_transaction(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    await update.callback_query.edit_message_reply_markup(reply_markup=None)
+    await update.callback_query.answer(
+        text="Transaction was left intact. You must review it manually from lunchmoney.app",
+        show_alert=True,
+    )
 
 
 async def handle_btn_cancel_categorization(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
+    update: Update, _: ContextTypes.DEFAULT_TYPE
 ):
     query = update.callback_query
     transaction_id = int(query.data.split("_")[1])
@@ -260,11 +271,43 @@ async def handle_btn_mark_tx_as_reviewed(update: Update, _: ContextTypes.DEFAULT
         )
 
 
+async def handle_btn_mark_tx_as_unreviewed(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+):
+    """Updates the transaction status to unreviewed."""
+    query = update.callback_query
+    chat_id = query.message.chat.id
+    lunch = get_lunch_client_for_chat_id(chat_id)
+    transaction_id = int(query.data.split("_")[1])
+    try:
+        lunch.update_transaction(
+            transaction_id, TransactionUpdateObject(status="uncleared")
+        )
+
+        # update message to show the right buttons
+        updated_tx = lunch.get_transaction(transaction_id)
+        msg_id = get_db().get_message_id_associated_with(transaction_id, chat_id)
+        await send_transaction_message(
+            context, transaction=updated_tx, chat_id=chat_id, message_id=msg_id
+        )
+
+        get_db().mark_as_unreviewed(query.message.message_id, chat_id)
+        await query.answer()
+    except Exception as e:
+        await query.answer(
+            text=f"Error marking transaction as reviewed: {str(e)}", show_alert=True
+        )
+
+
 async def handle_set_tx_notes_or_tags(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
     """Updates the transaction notes."""
+    handled = await handle_generic_message(update, context)
+    if handled:
+        return
+
     replying_to_msg_id = update.message.reply_to_message.message_id
     tx_id = get_db().get_tx_associated_with(replying_to_msg_id, update.message.chat_id)
 
@@ -301,6 +344,14 @@ async def handle_set_tx_notes_or_tags(
         logger.info(f"Setting notes to transaction ({tx_id}): {msg_text}")
         lunch.update_transaction(tx_id, TransactionUpdateObject(notes=msg_text))
 
+    # update the transaction message to show the new notes
+    updated_tx = lunch.get_transaction(tx_id)
+    await send_transaction_message(
+        context,
+        transaction=updated_tx,
+        chat_id=update.message.chat_id,
+        message_id=replying_to_msg_id,
+    )
     await context.bot.set_message_reaction(
         chat_id=update.message.chat_id,
         message_id=update.message.message_id,
@@ -353,6 +404,8 @@ async def handle_mark_unreviewed(update: Update, context: ContextTypes.DEFAULT_T
         reaction=ReactionEmoji.OK_HAND_SIGN,
     )
 
+    get_db().mark_as_unreviewed(replying_to_msg_id, chat_id)
+
 
 async def poll_transactions_on_schedule(context: ContextTypes.DEFAULT_TYPE):
     """
@@ -387,3 +440,79 @@ async def poll_transactions_on_schedule(context: ContextTypes.DEFAULT_TYPE):
         if should_poll:
             await check_transactions_and_telegram_them(context, chat_id=chat_id)
             get_db().update_last_poll_at(chat_id, datetime.now().isoformat())
+
+
+async def handle_expand_tx_options(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    transaction_id = int(update.callback_query.data.split("_")[1])
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_reply_markup(
+        reply_markup=get_tx_buttons(transaction_id, collapsed=False)
+    )
+
+
+async def handle_rename_payee(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    transaction_id = int(update.callback_query.data.split("_")[1])
+    await update.callback_query.answer()
+    await context.bot.send_message(
+        chat_id=get_chat_id(update),
+        text="Please enter the new payee name:",
+        reply_to_message_id=update.callback_query.message.message_id,
+        reply_markup=ForceReply(),
+    )
+    set_expectation(
+        get_chat_id(update),
+        {
+            "expectation": RENAME_PAYEE,
+            "msg_id": str(update.callback_query.message.message_id),
+            "transaction_id": str(transaction_id),
+        },
+    )
+
+
+async def handle_edit_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    transaction_id = int(update.callback_query.data.split("_")[1])
+    await update.callback_query.answer()
+    await context.bot.send_message(
+        chat_id=get_chat_id(update),
+        text=dedent(
+            """Please enter notes for this transaction.\n\n>
+                    *Hint:* _you can also reply to the transaction message to edit its notes._"""
+        ),
+        reply_to_message_id=update.callback_query.message.message_id,
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ForceReply(),
+    )
+    set_expectation(
+        get_chat_id(update),
+        {
+            "expectation": EDIT_NOTES,
+            "msg_id": str(update.callback_query.message.message_id),
+            "transaction_id": str(transaction_id),
+        },
+    )
+
+
+async def handle_set_tags(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    transaction_id = int(update.callback_query.data.split("_")[1])
+    await update.callback_query.answer()
+    await context.bot.send_message(
+        chat_id=get_chat_id(update),
+        text=dedent(
+            """
+            Please enter the tags for this transaction\n\n
+            💡 *Hint:* _you can also reply to the transaction message to edit its tags
+            if the message contains only tags like this: #tag1 #tag2 #etc_
+            """
+        ),
+        reply_to_message_id=update.callback_query.message.message_id,
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ForceReply(),
+    )
+    set_expectation(
+        get_chat_id(update),
+        {
+            "expectation": SET_TAGS,
+            "msg_id": str(update.callback_query.message.message_id),
+            "transaction_id": str(transaction_id),
+        },
+    )

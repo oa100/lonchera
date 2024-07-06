@@ -2,6 +2,7 @@ import logging
 import os
 from textwrap import dedent
 import traceback
+from lunchable import TransactionUpdateObject
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
@@ -10,10 +11,14 @@ from telegram.constants import ReactionEmoji
 
 from lunch import NoLunchToken, get_lunch_client_for_chat_id
 from handlers.expectations import (
+    EDIT_NOTES,
     EXPECTING_TOKEN,
+    RENAME_PAYEE,
+    SET_TAGS,
+    clear_expectation,
     get_expectation,
-    set_expectation,
 )
+from tx_messaging import send_transaction_message
 from utils import get_chat_id
 
 logger = logging.getLogger("handlers")
@@ -67,28 +72,136 @@ async def handle_errors(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ),
             parse_mode=ParseMode.MARKDOWN,
         )
-    else:
-        logger.error(
-            f"Update {update} caused error {context.error}",
-            exc_info=context.error,
-        )
+    logger.error(
+        f"Update {update} caused error {context.error}",
+        exc_info=context.error,
+    )
 
 
-async def handle_generic_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_generic_message(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> bool:
     # if waiting for a token, register it
     expectation = get_expectation(get_chat_id(update))
     if expectation and expectation["expectation"] == EXPECTING_TOKEN:
-        set_expectation(get_chat_id(update), None)
+        clear_expectation(get_chat_id(update))
 
         await context.bot.delete_message(
             chat_id=get_chat_id(update), message_id=expectation["msg_id"]
         )
 
-        return await handle_register_token(
-            update, context, token_override=update.message.text
+        await handle_register_token(update, context, token_override=update.message.text)
+        return True
+    elif expectation and expectation["expectation"] == RENAME_PAYEE:
+        clear_expectation(get_chat_id(update))
+
+        # updates the transaction with the new payee
+        lunch = get_lunch_client_for_chat_id(get_chat_id(update))
+        transaction_id = int(expectation["transaction_id"])
+        lunch.update_transaction(
+            transaction_id, TransactionUpdateObject(payee=update.message.text)
         )
 
-    logger.info(f"Received unexpected message: {update.message.text}")
+        # edit the message to reflect the new payee
+        updated_transaction = lunch.get_transaction(transaction_id)
+        msg_id = int(expectation["msg_id"])
+        await send_transaction_message(
+            context=context,
+            transaction=updated_transaction,
+            chat_id=get_chat_id(update),
+            message_id=msg_id,
+        )
+
+        # react to the message
+        await context.bot.set_message_reaction(
+            chat_id=update.message.chat_id,
+            message_id=update.message.message_id,
+            reaction=ReactionEmoji.WRITING_HAND,
+        )
+        return True
+    elif expectation and expectation["expectation"] == EDIT_NOTES:
+        clear_expectation(get_chat_id(update))
+
+        # updates the transaction with the new notes
+        lunch = get_lunch_client_for_chat_id(get_chat_id(update))
+        transaction_id = int(expectation["transaction_id"])
+        lunch.update_transaction(
+            transaction_id, TransactionUpdateObject(notes=update.message.text)
+        )
+
+        # edit the message to reflect the new notes
+        updated_transaction = lunch.get_transaction(transaction_id)
+        msg_id = int(expectation["msg_id"])
+        await send_transaction_message(
+            context=context,
+            transaction=updated_transaction,
+            chat_id=get_chat_id(update),
+            message_id=msg_id,
+        )
+
+        # react to the message
+        await context.bot.set_message_reaction(
+            chat_id=update.message.chat_id,
+            message_id=update.message.message_id,
+            reaction=ReactionEmoji.WRITING_HAND,
+        )
+        return True
+    elif expectation and expectation["expectation"] == SET_TAGS:
+        # make sure they look like tags
+        message_are_tags = True
+        for word in update.message.text.split(" "):
+            if not word.startswith("#"):
+                message_are_tags = False
+                break
+
+        if not message_are_tags:
+            await context.bot.send_message(
+                chat_id=get_chat_id(update),
+                text=dedent(
+                    """
+                    The message should only contain words suffixed with a hashtag `#`.
+                    For example: `#tag1 #tag2 #tag3`
+                    """
+                ),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return True
+
+        clear_expectation(get_chat_id(update))
+
+        # updates the transaction with the new notes
+        lunch = get_lunch_client_for_chat_id(get_chat_id(update))
+        transaction_id = int(expectation["transaction_id"])
+
+        tags_without_hashtag = [
+            tag[1:] for tag in update.message.text.split(" ") if tag.startswith("#")
+        ]
+        logger.info(
+            f"Setting tags to transaction ({transaction_id}): {tags_without_hashtag}"
+        )
+        lunch.update_transaction(
+            transaction_id, TransactionUpdateObject(tags=tags_without_hashtag)
+        )
+
+        # edit the message to reflect the new notes
+        updated_transaction = lunch.get_transaction(transaction_id)
+        msg_id = int(expectation["msg_id"])
+        await send_transaction_message(
+            context=context,
+            transaction=updated_transaction,
+            chat_id=get_chat_id(update),
+            message_id=msg_id,
+        )
+
+        # react to the message
+        await context.bot.set_message_reaction(
+            chat_id=update.message.chat_id,
+            message_id=update.message.message_id,
+            reaction=ReactionEmoji.WRITING_HAND,
+        )
+        return True
+
+    return False
 
 
 async def handle_trigger_plaid_refresh(

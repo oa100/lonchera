@@ -32,11 +32,16 @@ from handlers.transactions import (
     handle_btn_cancel_categorization,
     handle_btn_dump_plaid_details,
     handle_btn_mark_tx_as_reviewed,
+    handle_btn_mark_tx_as_unreviewed,
     handle_btn_show_categories,
     handle_btn_show_subcategories,
     handle_btn_skip_transaction,
     handle_check_transactions,
+    handle_edit_notes,
+    handle_expand_tx_options,
     handle_mark_unreviewed,
+    handle_rename_payee,
+    handle_set_tags,
     handle_set_tx_notes_or_tags,
     poll_transactions_on_schedule,
 )
@@ -89,7 +94,7 @@ def setup_handlers(config):
     app.add_handler(CommandHandler("mark_unreviewed", handle_mark_unreviewed))
     app.add_handler(CommandHandler("settings", handle_settings))
     app.add_handler(
-        CallbackQueryHandler(handle_btn_skip_transaction, pattern=r"^skip$")
+        CallbackQueryHandler(handle_btn_skip_transaction, pattern=r"^skip_")
     )
     app.add_handler(
         CallbackQueryHandler(
@@ -147,6 +152,15 @@ def setup_handlers(config):
     app.add_handler(
         CallbackQueryHandler(handle_btn_mark_tx_as_reviewed, pattern=r"^review_")
     )
+    app.add_handler(
+        CallbackQueryHandler(handle_btn_mark_tx_as_unreviewed, pattern=r"^unreview_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(handle_expand_tx_options, pattern=r"^moreOptions_")
+    )
+    app.add_handler(CallbackQueryHandler(handle_rename_payee, pattern=r"^renamePayee_"))
+    app.add_handler(CallbackQueryHandler(handle_edit_notes, pattern=r"^editNotes_"))
+    app.add_handler(CallbackQueryHandler(handle_set_tags, pattern=r"^setTags_"))
     app.add_handler(CallbackQueryHandler(handle_unknown_btn))
 
     app.add_error_handler(handle_errors)
@@ -180,5 +194,7 @@ if __name__ == "__main__":
     main()
 
 # TODO
-# - Edit transaction
-#   - Payee name
+# - Add option to show net worth
+# - Add option to show balances
+# - Add custom icons for famous merchants
+# - keep just one connection around

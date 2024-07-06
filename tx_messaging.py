@@ -8,6 +8,8 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from lunchable.models import TransactionObject
 
+from lunch import get_lunch_client_for_chat_id
+from persistence import get_db
 from utils import make_tag
 
 
@@ -15,32 +17,82 @@ logger = logging.getLogger("messaging")
 
 
 def get_tx_buttons(
-    transaction_id: int, plaid=True, skip=True, mark_reviewed=True, categorize=True
+    transaction: Union[TransactionObject, int],
+    collapsed=True,
 ) -> InlineKeyboardMarkup:
     """Returns a list of buttons to be displayed for a transaction."""
     buttons = []
-    if categorize:
+
+    # if transaction is an int, it's a transaction_id
+    if isinstance(transaction, int):
+        transaction_id = transaction
+        # assume the transaction is persisted if a transaction_id is provided
+        tx_metadata = get_db().get_tx_metadata(transaction_id)
+        if tx_metadata is None:
+            raise ValueError(f"Transaction {transaction_id} not in the database")
+        recurring_type, is_pending, is_reviewed = tx_metadata
+    else:
+        transaction_id = transaction.id
+        recurring_type = transaction.recurring_type
+        is_pending = transaction.is_pending
+        is_reviewed = transaction.status == "cleared"
+
+    if collapsed:
+        buttons.append(
+            InlineKeyboardButton(
+                "More options", callback_data=f"moreOptions_{transaction_id}"
+            )
+        )
+
+    # recurring transactions are not categorizable
+    categorize = recurring_type is None
+    if categorize and not collapsed:
         buttons.append(
             InlineKeyboardButton(
                 "Categorize", callback_data=f"categorize_{transaction_id}"
             )
         )
-    if plaid:
+
+    if not collapsed:
+        buttons.append(
+            InlineKeyboardButton(
+                "Rename payee", callback_data=f"renamePayee_{transaction_id}"
+            )
+        )
+        buttons.append(
+            InlineKeyboardButton(
+                "Edit notes", callback_data=f"editNotes_{transaction_id}"
+            )
+        )
+        buttons.append(
+            InlineKeyboardButton("Set tags", callback_data=f"setTags_{transaction_id}")
+        )
         buttons.append(
             InlineKeyboardButton(
                 "Dump plaid details", callback_data=f"plaid_{transaction_id}"
             )
         )
-    if skip:
+
+    skip = not is_pending
+    if skip and not collapsed and not is_reviewed:
         buttons.append(
             InlineKeyboardButton("Skip", callback_data=f"skip_{transaction_id}")
         )
-    if mark_reviewed:
+
+    if is_reviewed:
+        if not collapsed:
+            buttons.append(
+                InlineKeyboardButton(
+                    "Mark as unreviewed", callback_data=f"unreview_{transaction_id}"
+                )
+            )
+    else:
         buttons.append(
             InlineKeyboardButton(
                 "Mark as reviewed", callback_data=f"review_{transaction_id}"
             )
         )
+
     # max two buttons per row
     buttons = [buttons[i : i + 2] for i in range(0, len(buttons), 2)]
     return InlineKeyboardMarkup(buttons)
@@ -97,26 +149,21 @@ async def send_transaction_message(
     if transaction.is_pending:
         message += "\n_This is a pending transaction_\n"
 
-    # recurring transactions are not categorizable
-    show_categorize = transaction.recurring_type is None
-
-    if transaction.is_pending:
-        # when a transaction is pending, we don't want to mark it as reviewed
-        keyboard = get_tx_buttons(
-            transaction.id, mark_reviewed=False, skip=False, categorize=show_categorize
-        )
-    else:
-        keyboard = get_tx_buttons(transaction.id, categorize=show_categorize)
-
     if message_id:
         # edit existing message
-        await context.bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=message_id,
-            text=message,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=keyboard,
-        )
+        try:
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=message,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=get_tx_buttons(transaction),
+            )
+        except Exception as e:
+            if "Message is not modified" in str(e):
+                logger.info(f"Message {message_id} is not modified, skipping edit")
+            else:
+                raise e
         return message_id
     else:
         # send a new message
@@ -125,7 +172,7 @@ async def send_transaction_message(
             chat_id=chat_id,
             text=message,
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=keyboard,
+            reply_markup=get_tx_buttons(transaction),
             reply_to_message_id=reply_to_message_id,
         )
         return msg.id
@@ -146,6 +193,7 @@ async def send_plaid_details(
         reply_to_message_id=query.message.message_id,
     )
 
-    await query.edit_message_reply_markup(
-        reply_markup=get_tx_buttons(transaction_id, plaid=False)
-    )
+    lunch = get_lunch_client_for_chat_id(chat_id)
+    transaction = lunch.get_transaction(transaction_id)
+
+    await query.edit_message_reply_markup(reply_markup=get_tx_buttons(transaction))
