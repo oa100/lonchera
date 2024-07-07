@@ -19,7 +19,7 @@ from lunchable.models import TransactionObject
 
 from persistence import get_db
 from tx_messaging import get_tx_buttons, send_plaid_details, send_transaction_message
-from utils import find_related_tx, get_chat_id
+from utils import Keyboard, find_related_tx, get_chat_id
 
 logger = logging.getLogger("tx_handler")
 
@@ -159,29 +159,14 @@ async def handle_btn_show_categories(update: Update, _: ContextTypes.DEFAULT_TYP
     transaction_id = int(query.data.split("_")[1])
 
     categories = lunch.get_categories()
-    category_buttons = []
+    kbd = Keyboard()
     for category in categories:
         if category.group_id is None:
-            category_buttons.append(
-                InlineKeyboardButton(
-                    category.name,
-                    callback_data=f"subcategorize_{transaction_id}_{category.id}",
-                )
-            )
-    category_buttons = [
-        category_buttons[i : i + 3] for i in range(0, len(category_buttons), 3)
-    ]
-    category_buttons.append(
-        [
-            InlineKeyboardButton(
-                "Cancel", callback_data=f"cancelCategorization_{transaction_id}"
-            )
-        ]
-    )
+            kbd += (category.name, f"subcategorize_{transaction_id}_{category.id}")
 
-    await query.edit_message_reply_markup(
-        reply_markup=InlineKeyboardMarkup(category_buttons)
-    )
+    kbd += ("Cancel", f"cancelCategorization_{transaction_id}")
+
+    await query.edit_message_reply_markup(reply_markup=kbd.build(columns=3))
     await query.answer()
 
 

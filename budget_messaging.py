@@ -1,14 +1,14 @@
 from datetime import datetime
 import logging
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from lunchable.models import BudgetObject
 
 from typing import List, Optional
 
-from utils import get_chat_id, make_tag
+from utils import Keyboard, get_chat_id, make_tag
 
 logger = logging.getLogger("messaging")
 
@@ -38,54 +38,35 @@ def get_bugdet_buttons(current_budget_date: datetime) -> InlineKeyboardMarkup:
                 month=current_budget_date.month + 1
             )
 
-    buttons = []
-    buttons.append(
-        InlineKeyboardButton(
-            f"⏮️ {previous_month.strftime('%B %Y')}",
-            callback_data=f"showBudget_{previous_month.isoformat()}",
-        )
+    kbd = Keyboard()
+    kbd += (
+        f"⏮️ {previous_month.strftime('%B %Y')}",
+        f"showBudget_{previous_month.isoformat()}",
     )
     if next_month:
-        buttons.append(
-            InlineKeyboardButton(
-                f"{next_month.strftime('%B %Y')} ⏭️",
-                callback_data=f"showBudget_{next_month.isoformat()}",
-            )
+        kbd += (
+            f"{next_month.strftime('%B %Y')} ⏭️",
+            f"showBudget_{next_month.isoformat()}",
         )
 
-    return InlineKeyboardMarkup(
-        [
-            buttons,
-            [
-                InlineKeyboardButton(
-                    "Details",
-                    callback_data=f"showBudgetCategories_{current_budget_date.isoformat()}",
-                )
-            ],
-        ],
-    )
+    kbd += ("Details", f"showBudgetCategories_{current_budget_date.isoformat()}")
+
+    return kbd.build()
 
 
 def get_budget_category_buttons(
     budget_items: List[BudgetObject], budget_date: datetime
 ) -> InlineKeyboardMarkup:
-    buttons = []
+    kbd = Keyboard()
     for budget_item in budget_items:
-        buttons.append(
-            InlineKeyboardButton(
-                budget_item.category_name,
-                callback_data=f"showBudgetDetails_{budget_date.isoformat()}_{budget_item.category_id}",
-            )
+        kbd += (
+            budget_item.category_name,
+            f"showBudgetDetails_{budget_date.isoformat()}_{budget_item.category_id}",
         )
 
-    # 3 buttons per row
-    buttons = [buttons[i : i + 3] for i in range(0, len(buttons), 3)]
-
     # add exit button
-    buttons.append(
-        [InlineKeyboardButton("Exit", callback_data=f"exitBudgetDetails_{budget_date}")]
-    )
-    return InlineKeyboardMarkup(buttons)
+    kbd += ("Exit", f"exitBudgetDetails_{budget_date}")
+    return kbd.build(columns=3)
 
 
 def build_budget_message(budget: List[BudgetObject], budget_date: datetime):

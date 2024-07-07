@@ -202,3 +202,6 @@ if __name__ == "__main__":
 # - Add option to show balances
 # - Add custom icons for famous merchants
 # - keep just one connection around
+# - settings:
+#   force poll
+# - when a transaction was already sent and we force poll, show a link to the message ids for those txs

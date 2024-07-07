@@ -43,11 +43,9 @@ class Keyboard(list):
         self.append(other)
         return self
 
-    def build(self, max_per_row: int = 2) -> InlineKeyboardMarkup:
+    def build(self, columns: int = 2) -> InlineKeyboardMarkup:
         buttons = [
             InlineKeyboardButton(text, callback_data=data) for (text, data) in self
         ]
-        buttons = [
-            buttons[i : i + max_per_row] for i in range(0, len(buttons), max_per_row)
-        ]
+        buttons = [buttons[i : i + columns] for i in range(0, len(buttons), columns)]
         return InlineKeyboardMarkup(buttons)
