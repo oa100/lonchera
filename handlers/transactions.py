@@ -441,15 +441,14 @@ async def poll_transactions_on_schedule(context: ContextTypes.DEFAULT_TYPE):
 
         # this is the last time we polled, saved as a string using:
         # datetime.now().isoformat()
-        last_poll_at = settings["last_poll_at"]
+        last_poll_at = settings.last_poll_at
         should_poll = False
         if last_poll_at is None:
             logger.info(f"First poll for chat {chat_id}")
             last_poll_at = datetime.now() - timedelta(days=1)
             should_poll = True
         else:
-            last_poll_at = datetime.fromisoformat(last_poll_at)
-            poll_interval_seconds = settings["poll_interval_secs"]
+            poll_interval_seconds = settings.poll_interval_secs
             next_poll_at = last_poll_at + timedelta(seconds=poll_interval_seconds)
             should_poll = datetime.now() >= next_poll_at
 

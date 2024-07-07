@@ -40,7 +40,6 @@ def get_chat_id(update: Update) -> int:
 
 class Keyboard(list):
     def __iadd__(self, other):
-        print(other)
         self.append(other)
         return self
 
