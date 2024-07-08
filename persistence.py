@@ -25,8 +25,8 @@ Base = declarative_base()
 class Transaction(Base):
     __tablename__ = "transactions"
 
-    # id = Column(Integer, primary_key=True)
-    message_id = Column(Integer, nullable=False, primary_key=True)  # TODO revert
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    message_id = Column(Integer, nullable=False)
     tx_id = Column(Integer, nullable=False)
     chat_id = Column(Integer, nullable=False)
     pending = Column(Boolean, default=False, nullable=False)
@@ -111,17 +111,9 @@ class Persistence:
             )
             return transaction.tx_id if transaction else None
 
-    # TODO maybe just return the whole transaction object
-    def get_tx_metadata(self, tx_id: int) -> Optional[tuple[str, bool, bool]]:
+    def get_tx_by_id(self, tx_id: int) -> Optional[Transaction]:
         with self.Session() as session:
-            transaction = session.query(Transaction).filter_by(tx_id=tx_id).first()
-            if transaction:
-                return (
-                    transaction.recurring_type,
-                    transaction.pending,
-                    transaction.reviewed_at is not None,
-                )
-            return None
+            return session.query(Transaction).filter_by(tx_id=tx_id).first()
 
     def get_message_id_associated_with(self, tx_id: int, chat_id: int) -> Optional[int]:
         with self.Session() as session:

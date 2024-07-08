@@ -25,10 +25,14 @@ def get_tx_buttons(
     if isinstance(transaction, int):
         transaction_id = transaction
         # assume the transaction is persisted if a transaction_id is provided
-        tx_metadata = get_db().get_tx_metadata(transaction_id)
-        if tx_metadata is None:
+        tx = get_db().get_tx_by_id(transaction_id)
+        if tx is None:
             raise ValueError(f"Transaction {transaction_id} not in the database")
-        recurring_type, is_pending, is_reviewed = tx_metadata
+        recurring_type, is_pending, is_reviewed = (
+            tx.recurring_type,
+            tx.pending,
+            tx.reviewed_at is not None,
+        )
     else:
         transaction_id = transaction.id
         recurring_type = transaction.recurring_type
@@ -86,15 +90,11 @@ async def send_transaction_message(
         formatted_date_time = transaction.plaid_metadata.get("date")
 
     # Get category and category group
-    category = transaction.category_name or "Uncategorized"
     category_group = transaction.category_group_name
-    if category is None:
-        category_group = "*No Group*"
+    if category_group is None:
+        category_group = "*No Category Group*"
     else:
         category_group = make_tag(category_group, title=True)
-
-    # Get account display name
-    account_name = transaction.plaid_account_display_name or "N/A"
 
     recurring = ""
     if transaction.recurring_type:
@@ -114,11 +114,15 @@ async def send_transaction_message(
         reviewed_watermark = "\u200C"
 
     message = f"{category_group} {reviewed_watermark} {recurring}\n\n"
-    message += f"*Payee*: {transaction.payee}\n"
+    message += f"*{transaction.payee}*\n\n"
     message += f"*Amount*: `{explicit_sign}{abs(transaction.amount):,.2f}``{transaction.currency.upper()}`\n"
     message += f"*Date/Time*: {formatted_date_time}\n"
-    message += f"*Category*: {make_tag(category)} \n"
-    message += f"*Account*: {make_tag(account_name)}\n"
+
+    category_name = transaction.category_name or "Uncategorized"
+    message += f"*Category*: {make_tag(category_name)} \n"
+
+    acct_name = transaction.plaid_account_display_name or "N/A"
+    message += f"*Account*: {make_tag(acct_name)}\n"
     if transaction.notes:
         message += f"*Notes*: {transaction.notes}\n"
     if transaction.tags:
