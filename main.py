@@ -208,7 +208,6 @@ if __name__ == "__main__":
 
 # TODO
 # - Add option to show net worth
-# - Add option to show balances
 # - Add custom icons for famous merchants
 # - keep just one connection around
 # - settings:

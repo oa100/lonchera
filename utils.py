@@ -77,23 +77,23 @@ def get_emoji_for_account_type(acct_type: str) -> str:
     return "❓"
 
 
-def get_crypto_symbol(crypto_name: str) -> str:
+def get_crypto_symbol(crypto_symbol: str) -> str:
     crypto_symbols = {
-        "bitcoin": "₿",
-        "ethereum": "Ξ",
-        "litecoin": "Ł",
-        "ripple": "X",
-        "bitcoin cash": "₿",
-        "dogecoin": "Ð",
-        "monero": "ɱ",
+        "btc": "₿",
+        "eth": "Ξ",
+        "ltc": "Ł",
+        "xrp": "X",
+        "bch": "₿",
+        "doge": "Ð",
+        "xmr": "ɱ",
         "dash": "D",
-        "nem": "ξ",
+        "xem": "ξ",
         "neo": "文",
-        "stellar": "*",
-        "zcash": "ⓩ",
-        "cardano": "₳",
+        "xlm": "*",
+        "zec": "ⓩ",
+        "ada": "₳",
         "eos": "ε",
-        "iota": "ι",
+        "miota": "ι",
     }
 
-    return crypto_symbols.get(crypto_name.lower(), crypto_name)
+    return crypto_symbols.get(crypto_symbol.lower(), crypto_symbol)

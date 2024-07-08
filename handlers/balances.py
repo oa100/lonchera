@@ -1,5 +1,4 @@
-from textwrap import dedent
-from typing import List, Optional
+from typing import List, Optional, Union
 from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
@@ -47,7 +46,7 @@ def get_accounts_buttons(current_mask: int) -> InlineKeyboardMarkup:
     # Toggle the state of each button's corresponding bit in the mask
     show_balances_mask = current_mask ^ SHOW_BALANCES
     kbd += (
-        f"{emoji_for_field(SHOW_BALANCES)} Show balances",
+        f"{emoji_for_field(SHOW_BALANCES)} Show accounts",
         f"accountsBalances_{show_balances_mask}",
     )
 
@@ -72,92 +71,82 @@ def get_accounts_buttons(current_mask: int) -> InlineKeyboardMarkup:
     return kbd.build()
 
 
+def get_plaid_account_summary_text(acct: PlaidAccountObject, show_details: bool) -> str:
+    """Returns a message with the accounts and their balances."""
+    if show_details:
+        institution = ""
+        if acct.institution_name and acct.institution_name != (
+            acct.display_name or acct.name
+        ):
+            institution = f" (_{acct.institution_name}_)"
+        txt = f"*{acct.display_name or acct.name}* {institution}\n"
+        txt += f"Balance: `${acct.balance:,.2f}` {acct.currency.upper()}"
+        if acct.limit:
+            txt += f" / `${acct.limit:,.2f}` {acct.currency.upper()}\n"
+        else:
+            txt += "\n"
+        txt += f"Last update: {acct.balance_last_update.strftime('%a, %b %d at %I:%M %p')}\n"
+        return txt + f"Status: {acct.status}\n\n"
+    else:
+        return f" • *{acct.display_name or acct.name}*: `${acct.balance:,.2f}` {acct.currency.upper()}\n"
+
+
+def get_asset_summary_text(asset: AssetsObject, show_details: bool) -> str:
+    """Returns a message with the assets and their balances."""
+    if show_details:
+        institution = ""
+        if asset.institution_name and asset.institution_name != (
+            asset.display_name or asset.name
+        ):
+            institution = f" (_{asset.institution_name}_)"
+        txt = f"*{asset.display_name or asset.name}* {institution}\n"
+        txt += f"Balance: `${asset.balance:,.2f}` {asset.currency.upper()}\n"
+        return (
+            txt
+            + f"Last update: {asset.balance_as_of.strftime('%a, %b %d at %I:%M %p')}\n\n"
+        )
+    else:
+        return f" • *{asset.display_name or asset.name}*: `${asset.balance:,.2f}` {asset.currency.upper()}\n"
+
+
+def get_crypto_summary_text(acct: CryptoObject, show_details: bool) -> str:
+    if show_details:
+        txt = f"*{acct.name}* _({acct.institution_name})_\n"
+        txt += f"Balance: `${acct.balance:,.2f}` {get_crypto_symbol(acct.currency)}\n"
+        txt += f"Last update: {acct.balance_as_of.strftime('%a, %b %d at %I:%M %p')}\n"
+        return txt + f"Status: {acct.status}\n\n"
+    else:
+        return f" • *{acct.name}*: `${acct.balance:,.2f}` {get_crypto_symbol(acct.currency)}\n"
+
+
 def get_accounts_summary_text(
-    accts: List[PlaidAccountObject], show_details: bool
+    accts: List[Union[PlaidAccountObject, AssetsObject, CryptoObject]],
+    show_details: bool,
 ) -> str:
     """Returns a message with the accounts and their balances."""
     by_group = {}
     for acct in accts:
-        by_group.setdefault(acct.type, []).append(acct)
+        if isinstance(acct, PlaidAccountObject):
+            by_group.setdefault(acct.type, []).append(acct)
+        elif isinstance(acct, AssetsObject):
+            by_group.setdefault(acct.type_name, []).append(acct)
+        elif isinstance(acct, CryptoObject):
+            by_group.setdefault("cryptocurrency", []).append(acct)
 
     txt = ""
     for acct_type, accts in by_group.items():
         txt += f"{get_emoji_for_account_type(acct_type)} {make_tag(acct_type, title=True)}\n\n"
+
         for acct in accts:
-            if show_details:
-                institution = ""
-                if acct.institution_name and acct.institution_name != (
-                    acct.display_name or acct.name
-                ):
-                    institution = f" (_{acct.institution_name}_)"
-                txt += f"*{acct.display_name or acct.name}* {institution}\n"
-                txt += f"Balance: `${acct.balance:,.2f}` {acct.currency.upper()}"
-                if acct.limit:
-                    txt += f" / `${acct.limit:,.2f}` {acct.currency.upper()}\n"
-                else:
-                    txt += "\n"
-                txt += f"Last update: {acct.balance_last_update.strftime('%a, %b %d at %I:%M %p')}\n"
-                txt += f"Status: {acct.status}\n\n"
-            else:
-                txt += f" • *{acct.display_name or acct.name}*: `${acct.balance:,.2f}` {acct.currency.upper()}\n"
+            if isinstance(acct, PlaidAccountObject):
+                txt += get_plaid_account_summary_text(acct, show_details)
+            elif isinstance(acct, AssetsObject):
+                txt += get_asset_summary_text(acct, show_details)
+            elif isinstance(acct, CryptoObject):
+                txt += get_crypto_summary_text(acct, show_details)
         txt += "\n"
 
-    return dedent(
-        f"""*BALANCES*
-
-{txt}
-    """
-    )
-
-
-def get_assets_summary_text(assets: List[AssetsObject], show_details: bool) -> str:
-    """Returns a message with the assets and their balances."""
-    by_group = {}
-    for asset in assets:
-        by_group.setdefault(asset.type_name, []).append(asset)
-
-    txt = ""
-    for type, assets in by_group.items():
-        txt += f"{get_emoji_for_account_type(type)} {make_tag(type, title=True)}\n\n"
-        for asset in assets:
-            if show_details:
-                institution = ""
-                if asset.institution_name and asset.institution_name != (
-                    asset.display_name or asset.name
-                ):
-                    institution = f" (_{asset.institution_name}_)"
-                txt += f"*{asset.display_name or asset.name}* {institution}\n"
-                txt += f"Balance: `${asset.balance:,.2f}` {asset.currency.upper()}\n"
-                txt += f"Last update: {asset.balance_as_of.strftime('%a, %b %d at %I:%M %p')}\n"
-            else:
-                txt += f" • *{asset.display_name or asset.name}*: `${asset.balance:,.2f}` {asset.currency.upper()}\n"
-        txt += "\n"
-
-    return f"""*ASSETS*
-
-{txt}"""
-
-
-def get_crypto_summary_text(crypto: List[CryptoObject], show_details: bool) -> str:
-    by_institution: dict[str, List[CryptoObject]] = {}
-    for acct in crypto:
-        by_institution.setdefault(acct.institution_name, []).append(acct)
-
-    txt = ""
-    for institution, accts in by_institution.items():
-        txt += f"{make_tag(institution, title=True)}\n"
-        for acct in accts:
-            if show_details:
-                txt += f"*{acct.name}*\n"
-                txt += f"Balance: `${acct.balance:,.2f}` {acct.currency.upper()}\n"
-                txt += f"Last update: {acct.balance_as_of.strftime('%a, %b %d at %I:%M %p')}\n"
-                txt += f"Status: {acct.status}\n\n"
-            else:
-                txt += f" • *{acct.name}*: `${acct.balance:,.2f}` {get_crypto_symbol(acct.currency)}\n"
-        txt += "\n"
-    return f"""*CRYPTO*
-
-{txt}"""
+    return txt
 
 
 async def handle_show_balances(
@@ -169,18 +158,17 @@ async def handle_show_balances(
     """Shows all the Plaid accounts and its balances to the user."""
     lunch = get_lunch_client_for_chat_id(get_chat_id(update))
 
-    msg = ""
+    all_accounts = []
     if is_show_balances(mask):
-        accts = lunch.get_plaid_accounts()
-        msg += get_accounts_summary_text(accts, is_show_details(mask))
+        all_accounts += lunch.get_plaid_accounts()
 
     if is_show_assets(mask):
-        assets = lunch.get_assets()
-        msg += get_assets_summary_text(assets, is_show_details(mask))
+        all_accounts += lunch.get_assets()
 
     if is_show_crypto(mask):
-        crypto = lunch.get_crypto()
-        msg += get_crypto_summary_text(crypto, is_show_details(mask))
+        all_accounts += lunch.get_crypto()
+
+    msg = get_accounts_summary_text(all_accounts, is_show_details(mask))
 
     if message_id:
         await context.bot.edit_message_text(
