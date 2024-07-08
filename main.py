@@ -14,6 +14,7 @@ from telegram.ext import (
 from telegram.constants import ReactionEmoji
 
 
+from handlers.balances import handle_btn_accounts_balances, handle_show_balances
 from handlers.budget import (
     handle_btn_hide_budget_categories,
     handle_btn_show_budget_categories,
@@ -165,6 +166,14 @@ def setup_handlers(config):
     app.add_handler(CallbackQueryHandler(handle_rename_payee, pattern=r"^renamePayee_"))
     app.add_handler(CallbackQueryHandler(handle_edit_notes, pattern=r"^editNotes_"))
     app.add_handler(CallbackQueryHandler(handle_set_tags, pattern=r"^setTags_"))
+
+    app.add_handler(CommandHandler("balances", handle_show_balances))
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_btn_accounts_balances, pattern=r"^accountsBalances_"
+        )
+    )
+
     app.add_handler(CallbackQueryHandler(handle_unknown_btn))
 
     app.add_error_handler(handle_errors)
@@ -205,3 +214,4 @@ if __name__ == "__main__":
 # - settings:
 #   force poll
 # - when a transaction was already sent and we force poll, show a link to the message ids for those txs
+# - Add transactions manually

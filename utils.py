@@ -49,3 +49,51 @@ class Keyboard(list):
         ]
         buttons = [buttons[i : i + columns] for i in range(0, len(buttons), columns)]
         return InlineKeyboardMarkup(buttons)
+
+
+def get_emoji_for_account_type(acct_type: str) -> str:
+    if acct_type == "credit":
+        return "💳"
+    if acct_type == "depository":
+        return "🏦"
+    if acct_type == "investment":
+        return "📈"
+    if acct_type == "cash":
+        return "💵"
+    if acct_type == "loan":
+        return "💸"
+    if acct_type == "real estate":
+        return "🏠"
+    if acct_type == "vehicle":
+        return "🚗"
+    if acct_type == "cryptocurrency":
+        return "₿"
+    if acct_type == "employee compensation":
+        return "👨‍💼"
+    if acct_type == "other liability":
+        return "📉"
+    if acct_type == "other asset":
+        return "📊"
+    return "❓"
+
+
+def get_crypto_symbol(crypto_name: str) -> str:
+    crypto_symbols = {
+        "bitcoin": "₿",
+        "ethereum": "Ξ",
+        "litecoin": "Ł",
+        "ripple": "X",
+        "bitcoin cash": "₿",
+        "dogecoin": "Ð",
+        "monero": "ɱ",
+        "dash": "D",
+        "nem": "ξ",
+        "neo": "文",
+        "stellar": "*",
+        "zcash": "ⓩ",
+        "cardano": "₳",
+        "eos": "ε",
+        "iota": "ι",
+    }
+
+    return crypto_symbols.get(crypto_name.lower(), crypto_name)
