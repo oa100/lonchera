@@ -47,6 +47,7 @@ from handlers.transactions import (
     handle_set_tx_notes_or_tags,
     poll_transactions_on_schedule,
 )
+from manual_tx import setup_manual_tx_handler
 from persistence import get_db
 from handlers.settings import (
     handle_btn_change_poll_interval,
@@ -60,12 +61,15 @@ from handlers.settings import (
 )
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s"
+    level=logging.DEBUG, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s"
 )
 logger = logging.getLogger("lonchera")
 
-httpx_logger = logging.getLogger("httpx")
-httpx_logger.setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore.http11").setLevel(logging.WARNING)
+logging.getLogger("httpcore.connection").setLevel(logging.WARNING)
+logging.getLogger("telegram.ext.ExtBot").setLevel(logging.WARNING)
+logging.getLogger("telegram.ext.Updater").setLevel(logging.WARNING)
 
 
 def setup_handlers(config):
@@ -85,6 +89,8 @@ def setup_handlers(config):
 
     async def handle_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_set_tx_notes_or_tags(update, context)
+
+    setup_manual_tx_handler(app)
 
     app.add_handler(CommandHandler("start", handle_start))
     app.add_handler(CommandHandler("register", handle_register_token))
@@ -178,8 +184,7 @@ def setup_handlers(config):
 
     app.add_error_handler(handle_errors)
 
-    job_queue = app.job_queue
-    job_queue.run_repeating(poll_transactions_on_schedule, interval=60, first=5)
+    app.job_queue.run_repeating(poll_transactions_on_schedule, interval=60, first=5)
 
     app.add_handler(MessageHandler(filters.TEXT & filters.REPLY, handle_reply))
     app.add_handler(MessageHandler(filters.TEXT, handle_generic_message))

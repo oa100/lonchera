@@ -28,6 +28,7 @@ def find_related_tx(
     return None
 
 
+# TODO replace with update.effective_chat.id
 def get_chat_id(update: Update) -> int:
     if update.message:
         return update.message.chat_id
@@ -49,6 +50,15 @@ class Keyboard(list):
         ]
         buttons = [buttons[i : i + columns] for i in range(0, len(buttons), columns)]
         return InlineKeyboardMarkup(buttons)
+
+    def build_from(*btns: tuple[str, str]) -> InlineKeyboardMarkup:
+        if not btns:
+            raise ValueError("At least one button must be provided.")
+
+        kbd = Keyboard()
+        for btn in btns:
+            kbd += btn
+        return kbd.build()
 
 
 def get_emoji_for_account_type(acct_type: str) -> str:

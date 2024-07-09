@@ -61,7 +61,7 @@ def get_tx_buttons(
         if is_reviewed:
             kbd += ("Mark as unreviewed", f"unreview_{transaction_id}")
 
-    if not is_reviewed:
+    if not is_reviewed and not is_pending:
         kbd += ("Mark as reviewed", f"review_{transaction_id}")
 
     if not is_pending and not collapsed and is_reviewed:
@@ -80,14 +80,21 @@ async def send_transaction_message(
     """Sends a message to the chat_id with the details of a transaction.
     If message_id is provided, edits the existing"""
     # Get the datetime from plaid_metadata
-    authorized_datetime = transaction.plaid_metadata.get("authorized_datetime")
-    if authorized_datetime:
-        date_time = datetime.fromisoformat(authorized_datetime.replace("Z", "-02:00"))
-        pst_tz = pytz.timezone("US/Pacific")
-        pst_date_time = date_time.astimezone(pst_tz)
-        formatted_date_time = pst_date_time.strftime("%a, %b %d at %I:%M %p PST")
+    if transaction.plaid_metadata:
+        authorized_datetime = transaction.plaid_metadata.get(
+            "authorized_datetime", None
+        )
+        if authorized_datetime:
+            date_time = datetime.fromisoformat(
+                authorized_datetime.replace("Z", "-02:00")
+            )
+            pst_tz = pytz.timezone("US/Pacific")
+            pst_date_time = date_time.astimezone(pst_tz)
+            formatted_date_time = pst_date_time.strftime("%a, %b %d at %I:%M %p PST")
+        else:
+            formatted_date_time = transaction.plaid_metadata.get("date")
     else:
-        formatted_date_time = transaction.plaid_metadata.get("date")
+        formatted_date_time = transaction.date.strftime("%a, %b %d at %I:%M %p")
 
     # Get category and category group
     category_group = transaction.category_group_name
@@ -121,7 +128,11 @@ async def send_transaction_message(
     category_name = transaction.category_name or "Uncategorized"
     message += f"*Category*: {make_tag(category_name)} \n"
 
-    acct_name = transaction.plaid_account_display_name or "N/A"
+    acct_name = (
+        transaction.plaid_account_display_name
+        or transaction.account_display_name
+        or "Unknown Account"
+    )
     message += f"*Account*: {make_tag(acct_name)}\n"
     if transaction.notes:
         message += f"*Notes*: {transaction.notes}\n"
