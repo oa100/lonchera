@@ -360,54 +360,6 @@ async def handle_set_tx_notes_or_tags(
     )
 
 
-async def handle_mark_unreviewed(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.message.chat_id
-    if update.message.reply_to_message is None:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="/mark_unreviewed must be a reply to the tramsaction you want to mark as unreviewed",
-        )
-        return
-
-    replying_to_msg_id = update.message.reply_to_message.message_id
-    transaction_id = get_db().get_tx_associated_with(replying_to_msg_id, chat_id)
-
-    if transaction_id is None:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=dedent(
-                """
-                Could not find the transaction associated with the message.
-                This is a bug if you have not wiped the state.
-                """
-            ),
-        )
-        return
-
-    logger.info(
-        f"Marking transaction {transaction_id} from message {replying_to_msg_id} as unreviewed"
-    )
-    lunch = get_lunch_client_for_chat_id(chat_id)
-    lunch.update_transaction(
-        transaction_id, TransactionUpdateObject(status="uncleared")
-    )
-
-    # update message to show the right buttons
-    updated_tx = lunch.get_transaction(transaction_id)
-    await send_transaction_message(
-        context, transaction=updated_tx, chat_id=chat_id, message_id=replying_to_msg_id
-    )
-
-    # add reaction to the command message
-    await context.bot.set_message_reaction(
-        chat_id=chat_id,
-        message_id=update.message.message_id,
-        reaction=ReactionEmoji.OK_HAND_SIGN,
-    )
-
-    get_db().mark_as_unreviewed(replying_to_msg_id, chat_id)
-
-
 async def poll_transactions_on_schedule(context: ContextTypes.DEFAULT_TYPE):
     """
     Gets called every minute to poll transactions for all registered chats.

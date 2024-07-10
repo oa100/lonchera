@@ -11,7 +11,6 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-from telegram.constants import ReactionEmoji
 
 
 from handlers.balances import handle_btn_accounts_balances, handle_show_balances
@@ -22,6 +21,7 @@ from handlers.budget import (
     handle_show_budget,
 )
 from handlers.general import (
+    clear_cache,
     handle_errors,
     handle_generic_message,
     handle_start,
@@ -41,14 +41,12 @@ from handlers.transactions import (
     handle_check_transactions,
     handle_edit_notes,
     handle_expand_tx_options,
-    handle_mark_unreviewed,
     handle_rename_payee,
     handle_set_tags,
     handle_set_tx_notes_or_tags,
     poll_transactions_on_schedule,
 )
 from manual_tx import setup_manual_tx_handler
-from persistence import get_db
 from handlers.settings import (
     handle_btn_change_poll_interval,
     handle_btn_done_settings,
@@ -75,20 +73,9 @@ logging.getLogger("telegram.ext.Updater").setLevel(logging.WARNING)
 def setup_handlers(config):
     app = Application.builder().token(config["TELEGRAM_BOT_TOKEN"]).build()
 
-    async def clear_cache(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        get_db().nuke(update.message.chat_id)
-        await context.bot.set_message_reaction(
-            chat_id=update.message.chat_id,
-            message_id=update.message.message_id,
-            reaction=ReactionEmoji.THUMBS_UP,
-        )
-
-    async def handle_unknown_btn(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_unknown_btn(update: Update, _: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer(text=f"Unknown command {query.data}", show_alert=True)
-
-    async def handle_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await handle_set_tx_notes_or_tags(update, context)
 
     setup_manual_tx_handler(app)
 
@@ -99,7 +86,6 @@ def setup_handlers(config):
     app.add_handler(CommandHandler("refresh", handle_trigger_plaid_refresh))
     app.add_handler(CommandHandler("show_budget", handle_show_budget))
     app.add_handler(CommandHandler("clear_cache", clear_cache))
-    app.add_handler(CommandHandler("mark_unreviewed", handle_mark_unreviewed))
     app.add_handler(CommandHandler("settings", handle_settings))
     app.add_handler(
         CallbackQueryHandler(handle_btn_skip_transaction, pattern=r"^skip_")
@@ -186,7 +172,9 @@ def setup_handlers(config):
 
     app.job_queue.run_repeating(poll_transactions_on_schedule, interval=60, first=5)
 
-    app.add_handler(MessageHandler(filters.TEXT & filters.REPLY, handle_reply))
+    app.add_handler(
+        MessageHandler(filters.TEXT & filters.REPLY, handle_set_tx_notes_or_tags)
+    )
     app.add_handler(MessageHandler(filters.TEXT, handle_generic_message))
 
     logger.info("Telegram handlers set up successfully")
@@ -217,3 +205,4 @@ if __name__ == "__main__":
 #   force poll
 # - when a transaction was already sent and we force poll, show a link to the message ids for those txs
 # - Add transactions manually
+# add /refresh (plaid) to settings

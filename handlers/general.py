@@ -18,6 +18,7 @@ from handlers.expectations import (
     clear_expectation,
     get_expectation,
 )
+from persistence import get_db
 from tx_messaging import send_transaction_message
 from utils import get_chat_id
 
@@ -213,4 +214,13 @@ async def handle_trigger_plaid_refresh(
         chat_id=update.message.chat_id,
         message_id=update.message.message_id,
         reaction=ReactionEmoji.HANDSHAKE,
+    )
+
+
+async def clear_cache(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    get_db().nuke(update.message.chat_id)
+    await context.bot.set_message_reaction(
+        chat_id=update.message.chat_id,
+        message_id=update.message.message_id,
+        reaction=ReactionEmoji.THUMBS_UP,
     )
