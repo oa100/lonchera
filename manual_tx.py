@@ -3,12 +3,9 @@ from textwrap import dedent
 from lunchable import TransactionInsertObject
 from telegram import Update
 from telegram.ext import (
-    CommandHandler,
-    MessageHandler,
     CallbackQueryHandler,
     ConversationHandler,
     ContextTypes,
-    filters,
     Application,
 )
 from telegram.constants import ParseMode
@@ -17,7 +14,7 @@ import datetime
 from lunch import get_lunch_client_for_chat_id
 from persistence import get_db
 from tx_messaging import send_transaction_message
-from utils import Keyboard, make_tag
+from utils import CONVERSATION_MSG_ID, Keyboard, build_conversation_handler, make_tag
 
 # Conversation states
 (
@@ -33,6 +30,7 @@ from utils import Keyboard, make_tag
 ) = range(9)
 
 # Define callback data
+CONTINUE = "continue"
 TODAY, YESTERDAY = "today", "yesterday"
 USD, COP = "USD", "COP"
 CREDIT, DEBIT, CASH = "credit", "debit", "cash"
@@ -65,12 +63,12 @@ def get_transaction_state_message(
         f"""
         *Manual transaction form*
 
+        *Account*: {account}
+        *Amount*: `{amount:,.2f}` {currency.upper()}
         *Date*: {date}
         *Category*: {category}
         *Payee*: {payee}
-        *Amount*: {amount:,.2f} {currency}
         *Notes*: {notes}
-        *Account*: {account}
         """
     )
 
@@ -80,29 +78,58 @@ def get_transaction_state_message(
     return result
 
 
-async def start_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    kbd = Keyboard()
-    kbd += ("Today", TODAY)
-    kbd += ("Yesterday", YESTERDAY)
-    kbd += ("Cancel", CANCEL)
-    msg_ctx = await update.message.reply_text(
+async def start_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    msg = await update.message.reply_text(
         text=dedent(
             """
-            *Manual transaction form*
+            *Add manual transaction*
 
-            I will be asking your for the basic information of your transaction.
+            This wizard will allow you to add a transaction manually.
 
-            Let's start by typing the date (format: `YYYY-MM-DD`) or select an option:
+            This can only be done for accounts that are not managed by Plaid.
+
+            It requires inputing the date, payee name and amount of the transaction.
+
+            Alternatively, you can also specify the category, and notes.
             """
         ),
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=kbd.build(),
+        reply_markup=Keyboard().build_from(
+            ("Continue", CONTINUE),
+            ("Cancel", CANCEL),
+        ),
     )
-    context.user_data["add_tx_msg_id"] = msg_ctx.message_id
-    return DATE
+    context.user_data.clear()
+    return msg.message_id
 
 
-async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def prompt_for_date(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    error_msg: str = "",
+):
+    message = "Please enter the date in the format `YYYY-MM-DD` or select an option:"
+
+    if error_msg != "":
+        message = f"{error_msg}\n\n{message}"
+
+    await context.bot.edit_message_text(
+        chat_id=update.effective_chat.id,
+        message_id=context.user_data[CONVERSATION_MSG_ID],
+        text=get_transaction_state_message(
+            context,
+            extra_info=message,
+        ),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=Keyboard().build_from(
+            ("Today", TODAY),
+            ("Yesterday", YESTERDAY),
+            ("Cancel", CANCEL),
+        ),
+    )
+
+
+async def capture_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     query = update.callback_query
     if query:
         await query.answer()
@@ -114,6 +141,9 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 else datetime.date.today() - datetime.timedelta(days=1)
             )
             context.user_data["date"] = date.strftime("%Y-%m-%d")
+            return True
+        else:
+            raise ValueError(f"Invalid button pressed: {query.data}")
     else:
         await context.bot.delete_message(
             chat_id=update.effective_chat.id,
@@ -121,33 +151,27 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         try:
             # validate date to make sure it's in the right format
-            datetime.datetime.strptime(update.message.text, "%Y-%m-%d")
-            context.user_data["date"] = update.message.text
+            context.user_data["date"] = datetime.datetime.strptime(
+                update.message.text, "%Y-%m-%d"
+            )
+            return True
         except ValueError:
-            kbd = Keyboard()
-            kbd += ("Today", TODAY)
-            kbd += ("Yesterday", YESTERDAY)
-            kbd += ("Cancel", CANCEL)
-            await context.bot.edit_message_text(
-                chat_id=update.effective_chat.id,
-                message_id=context.user_data["add_tx_msg_id"],
-                text=dedent(
+            await prompt_for_date(
+                update,
+                context,
+                error_msg=dedent(
                     f"""
-                    *Manual transaction form*
-
                     Invalid date (`{update.message.text}`).
-
-                    Please enter the date in the format `YYYY-MM-DD` or select an option:
                     """
                 ),
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=kbd.build(),
             )
+            return False
 
-            return DATE
 
+async def prompt_for_category_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lunch = get_lunch_client_for_chat_id(update.effective_chat.id)
     categories = lunch.get_categories()
+
     kbd = Keyboard()
     for category in categories:
         if category.group_id is None:
@@ -157,39 +181,46 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.edit_message_text(
         chat_id=update.effective_chat.id,
-        message_id=context.user_data["add_tx_msg_id"],
+        message_id=context.user_data[CONVERSATION_MSG_ID],
         text=get_transaction_state_message(context, "Please select a category:"),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=kbd.build(),
     )
-    return CATEGORY_GROUP
 
 
-async def get_subcategory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def capture_category_group(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> bool:
     query = update.callback_query
     await query.answer()
 
     category_group_id = query.data.split("_")[1]
     context.user_data["category_group"] = category_group_id
+    return True
 
+
+async def prompt_for_subcategory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lunch = get_lunch_client_for_chat_id(update.effective_chat.id)
     subcategories = lunch.get_categories()
     kbd = Keyboard()
     for subcategory in subcategories:
-        if str(subcategory.group_id) == str(category_group_id):
+        if str(subcategory.group_id) == str(context.user_data["category_group"]):
             kbd += (subcategory.name, f"subcategory_{subcategory.id}")
 
     kbd += ("Cancel", CANCEL)
 
-    await query.edit_message_text(
+    await context.bot.edit_message_text(
+        chat_id=update.effective_chat.id,
+        message_id=context.user_data[CONVERSATION_MSG_ID],
         text=get_transaction_state_message(context, "Please select a subcategory:"),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=kbd.build(),
     )
-    return CATEGORY
 
 
-async def get_payee(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def capture_subcategory(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> bool:
     query = update.callback_query
     await query.answer()
 
@@ -199,64 +230,69 @@ async def get_payee(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lunch = get_lunch_client_for_chat_id(update.effective_chat.id)
     category = lunch.get_category(category_id)
     context.user_data["category"] = category.name
+    return True
 
-    await query.edit_message_text(
+
+async def prompt_for_payee(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.edit_message_text(
+        chat_id=update.effective_chat.id,
+        message_id=context.user_data[CONVERSATION_MSG_ID],
         text=get_transaction_state_message(
             context, "Enter the name of the merchant or payee:"
         ),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=Keyboard.build_from(("Cancel", CANCEL)),
     )
-    return PAYEE
 
 
-async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def capture_payee(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     context.user_data["payee"] = update.message.text
     await context.bot.delete_message(
         chat_id=update.effective_chat.id, message_id=update.message.message_id
     )
+    return True
+
+
+async def prompt_for_amount(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    error_msg: str = "",
+):
+    currency = context.user_data.get("currency", "USD")
+    account = context.user_data["account"]
+    message = f"The currency for *{account}* is `{currency.upper()}`\n\nEnter the transaction amount:"
+    if error_msg != "":
+        message = f"{error_msg}\n\n{message}"
 
     await context.bot.edit_message_text(
         chat_id=update.effective_chat.id,
-        message_id=context.user_data["add_tx_msg_id"],
+        message_id=context.user_data[CONVERSATION_MSG_ID],
         text=get_transaction_state_message(
             context,
-            "Enter the transaction amount (defaults to USD but you can specify the currency like this: `5000 cop`):",
+            message,
         ),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=Keyboard.build_from(("Cancel", CANCEL)),
     )
-    return AMOUNT
 
 
-async def get_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def capture_amount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     amount = update.message.text
     if " " in amount:
         amount, currency = amount.split(" ")
 
         # make sure currency is a three letters string
         if len(currency) != 3:
-            await context.bot.edit_message_text(
-                chat_id=update.effective_chat.id,
-                message_id=context.user_data["add_tx_msg_id"],
-                text=get_transaction_state_message(
-                    context,
-                    dedent(
-                        f"""
-                        Invalid currency (`{currency}`). It must be a three letters string (e.g. `USD`).
-
-                        Please enter the transaction amount (defaults to USD but you can specify the currency like this: `5000 cop`):
-                        """
-                    ),
-                ),
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=Keyboard.build_from(("Cancel", CANCEL)),
+            await prompt_for_amount(
+                update,
+                context,
+                f"Invalid currency (`{currency}`). It must be a three letters string (e.g. `USD`).",
             )
 
             await context.bot.delete_message(
                 chat_id=update.effective_chat.id, message_id=update.message.message_id
             )
-            return AMOUNT
+            return False
 
         context.user_data["currency"] = currency.upper()
 
@@ -264,37 +300,33 @@ async def get_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         float(amount)
     except ValueError:
-        await context.bot.edit_message_text(
-            chat_id=update.effective_chat.id,
-            message_id=context.user_data["add_tx_msg_id"],
-            text=get_transaction_state_message(
-                context,
-                dedent(
-                    f"""
-                    Invalid amount (`{amount}`). It must be a number (e.g. `42.5`).
-
-                    Please enter the transaction amount (defaults to USD but you can specify the currency like this: `5000 cop`):
-                    """
-                ),
-            ),
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=Keyboard.build_from(("Cancel", CANCEL)),
+        await prompt_for_amount(
+            update,
+            context,
+            f"Invalid amount (`{amount}`). It must be a number (e.g. `42.5`).",
         )
-        context.user_data["currency"] = None
 
         await context.bot.delete_message(
             chat_id=update.effective_chat.id, message_id=update.message.message_id
         )
-        return AMOUNT
+        context.user_data["currency"] = None
+        await context.bot.delete_message(
+            chat_id=update.effective_chat.id, message_id=update.message.message_id
+        )
+        return False
 
     context.user_data["amount"] = amount
 
     await context.bot.delete_message(
         chat_id=update.effective_chat.id, message_id=update.message.message_id
     )
+    return True
+
+
+async def prompt_for_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.edit_message_text(
         chat_id=update.effective_chat.id,
-        message_id=context.user_data["add_tx_msg_id"],
+        message_id=context.user_data[CONVERSATION_MSG_ID],
         text=get_transaction_state_message(
             context,
             "Enter any notes (optional):",
@@ -302,10 +334,23 @@ async def get_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=Keyboard.build_from(("Skip", SKIP), ("Cancel", CANCEL)),
     )
-    return NOTES
 
 
-async def get_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def capture_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    query = update.callback_query
+    if query:
+        # assume it was a skip button
+        await query.answer()
+        return True
+
+    context.user_data["notes"] = update.message.text
+    await context.bot.delete_message(
+        chat_id=update.effective_chat.id, message_id=update.message.message_id
+    )
+    return True
+
+
+async def prompt_for_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # get all the assets accounts
     lunch = get_lunch_client_for_chat_id(update.effective_chat.id)
     assets = lunch.get_assets()
@@ -321,28 +366,9 @@ async def get_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
         kbd += (f"{acct.display_name or acct.name}", f"account_{acct.id}")
     kbd += ("Cancel", CANCEL)
 
-    query = update.callback_query
-    if query:
-        await query.answer()
-
-        await context.bot.edit_message_text(
-            chat_id=update.effective_chat.id,
-            message_id=context.user_data["add_tx_msg_id"],
-            text=get_transaction_state_message(
-                context,
-                "Select the account:",
-            ),
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=kbd.build(),
-        )
-        return ACCOUNT
-    context.user_data["notes"] = update.message.text
-    await context.bot.delete_message(
-        chat_id=update.effective_chat.id, message_id=update.message.message_id
-    )
     await context.bot.edit_message_text(
         chat_id=update.effective_chat.id,
-        message_id=context.user_data["add_tx_msg_id"],
+        message_id=context.user_data[CONVERSATION_MSG_ID],
         text=get_transaction_state_message(
             context,
             "Select the account:",
@@ -350,10 +376,9 @@ async def get_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=kbd.build(),
     )
-    return ACCOUNT
 
 
-async def confirm_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def capture_account(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     query = update.callback_query
 
     account_id = query.data.split("_")[1]
@@ -367,9 +392,16 @@ async def confirm_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE
     if account:
         context.user_data["account"] = account.display_name or account.name
 
-    await query.answer()
+    context.user_data["currency"] = account.currency
 
-    await query.edit_message_text(
+    await query.answer()
+    return True
+
+
+async def confirm_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.edit_message_text(
+        chat_id=update.effective_chat.id,
+        message_id=context.user_data[CONVERSATION_MSG_ID],
         text=get_transaction_state_message(context),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=Keyboard.build_from(
@@ -378,7 +410,6 @@ async def confirm_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE
             ("Cancel", CANCEL),
         ),
     )
-    return CONFIRM
 
 
 async def save_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -409,15 +440,20 @@ async def save_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
     transaction = lunch.get_transaction(transaction_id)
 
     await query.answer("Transaction saved successfully!", show_alert=True)
+    logger.info(f"Transaction saved: {transaction}")
 
     msg_id = await send_transaction_message(
         context,
         transaction=transaction,
         chat_id=update.effective_chat.id,
-        message_id=context.user_data["add_tx_msg_id"],
+        message_id=context.user_data[CONVERSATION_MSG_ID],
     )
     get_db().mark_as_sent(
-        transaction.id, update.effective_chat.id, msg_id, transaction.recurring_type
+        transaction.id,
+        update.effective_chat.id,
+        msg_id,
+        transaction.recurring_type,
+        reviewed=True,
     )
 
     return ConversationHandler.END
@@ -426,56 +462,26 @@ async def save_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.delete_message(
         chat_id=update.effective_chat.id,
-        message_id=context.user_data["add_tx_msg_id"],
+        message_id=context.user_data[CONVERSATION_MSG_ID],
     )
-    context.user_data["add_tx_msg_id"] = None
+    context.user_data.clear()
     return ConversationHandler.END
 
 
 def setup_manual_tx_handler(app: Application):
-    transaction_handler = ConversationHandler(
-        entry_points=[CommandHandler("add_transaction", start_transaction)],
-        states={
-            DATE: [
-                CallbackQueryHandler(cancel, pattern=CANCEL),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, get_category),
-                CallbackQueryHandler(get_category),
-            ],
-            CATEGORY_GROUP: [
-                CallbackQueryHandler(cancel, pattern=CANCEL),
-                CallbackQueryHandler(get_subcategory),
-            ],
-            CATEGORY: [
-                CallbackQueryHandler(cancel, pattern=CANCEL),
-                CallbackQueryHandler(get_payee),
-            ],
-            PAYEE: [
-                CallbackQueryHandler(cancel, pattern=CANCEL),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, get_amount),
-            ],
-            AMOUNT: [
-                CallbackQueryHandler(cancel, pattern=CANCEL),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, get_notes),
-                CallbackQueryHandler(get_notes),
-            ],
-            NOTES: [
-                CallbackQueryHandler(cancel, pattern=CANCEL),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, get_account),
-                CallbackQueryHandler(get_account),
-            ],
-            ACCOUNT: [
-                CallbackQueryHandler(cancel, pattern=CANCEL),
-                CallbackQueryHandler(confirm_transaction),
-            ],
-            CONFIRM: [
-                CallbackQueryHandler(cancel, pattern=CANCEL),
-                CallbackQueryHandler(save_transaction, pattern=SPENT_MONEY),
-                CallbackQueryHandler(save_transaction, pattern=RECEIVED_MONEY),
-            ],
-        },
-        fallbacks=[
-            CallbackQueryHandler(cancel, pattern=CANCEL),
+    transaction_handler = build_conversation_handler(
+        start_step=start_transaction,
+        steps=[
+            (prompt_for_account, capture_account),
+            (prompt_for_amount, capture_amount),
+            (prompt_for_date, capture_date),
+            (prompt_for_category_group, capture_category_group),
+            (prompt_for_subcategory, capture_subcategory),
+            (prompt_for_payee, capture_payee),
+            (prompt_for_notes, capture_notes),
+            (confirm_transaction, save_transaction),
         ],
+        cancel_handler=CallbackQueryHandler(cancel, pattern=CANCEL),
     )
 
     app.add_handler(transaction_handler)

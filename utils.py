@@ -2,6 +2,14 @@ from typing import List, Optional
 from lunchable.models import TransactionObject
 import emoji
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import (
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ConversationHandler,
+    ContextTypes,
+    filters,
+)
 
 
 def is_emoji(char):
@@ -57,7 +65,8 @@ class Keyboard(list):
 
         kbd = Keyboard()
         for btn in btns:
-            kbd += btn
+            if btn:
+                kbd += btn
         return kbd.build()
 
 
@@ -107,3 +116,68 @@ def get_crypto_symbol(crypto_symbol: str) -> str:
     }
 
     return crypto_symbols.get(crypto_symbol.lower(), crypto_symbol)
+
+
+CONVERSATION_MSG_ID = "conversation_msg_id"
+
+
+def build_conversation_handler(
+    start_step, steps: List, cancel_handler: CallbackQueryHandler
+) -> ConversationHandler:
+    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        message_id = await start_step(update, context)
+        context.user_data[CONVERSATION_MSG_ID] = message_id
+        return 0
+
+    async def initial_capture(update: Update, _: ContextTypes.DEFAULT_TYPE) -> bool:
+        # this just handles the initial confirmation to proceed
+        await update.callback_query.answer()
+        return True
+
+    def join_capture_and_prompt(current_count, cap, pro):
+        async def step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            # runs the capture function, which is responsible for
+            # storing the data from the last step
+            success = await cap(update, context)
+            if not success:
+                # when this returns False, it means there was an issue with
+                # the data capture, so we don't proceed to the next step
+                return current_count
+            # runs the prompt function, which is responsible for asking the user
+            # to input the data for the next step
+            await pro(update, context)
+            return current_count + 1
+
+        return step
+
+    states = {}
+    count = 0
+    last_capture = initial_capture
+    # build the states array by joining the capture from step N to the prompt for step N+1
+    for prompt, capture in steps:
+        step = join_capture_and_prompt(count, last_capture, prompt)
+        state_handlers = [
+            cancel_handler,
+            MessageHandler(filters.TEXT & ~filters.COMMAND, step),
+            CallbackQueryHandler(step),
+        ]
+
+        states[count] = state_handlers
+        count += 1
+        last_capture = capture
+
+    async def end_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await last_capture(update, context)
+        return ConversationHandler.END
+
+    states[count] = [
+        cancel_handler,
+        MessageHandler(filters.TEXT & ~filters.COMMAND, end_step),
+        CallbackQueryHandler(end_step),
+    ]
+
+    return ConversationHandler(
+        entry_points=[CommandHandler("add_transaction", start)],
+        states=states,
+        fallbacks=[cancel_handler],
+    )

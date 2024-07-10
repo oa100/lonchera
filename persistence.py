@@ -89,6 +89,7 @@ class Persistence:
         message_id: int,
         recurring_type: Optional[str],
         pending=False,
+        reviewed=False,
     ) -> None:
         logger.info(f"Marking transaction {tx_id} as sent with message ID {message_id}")
         with self.Session() as session:
@@ -98,6 +99,7 @@ class Persistence:
                 chat_id=chat_id,
                 pending=pending,
                 recurring_type=recurring_type,
+                reviewed_at=datetime.now() if reviewed else None,
             )
             session.add(new_transaction)
             session.commit()
