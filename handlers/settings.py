@@ -4,9 +4,10 @@ from typing import Optional
 from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
+from telegram.constants import ReactionEmoji
 
 from handlers.expectations import EXPECTING_TOKEN, set_expectation
-from lunch import get_lunch_client
+from lunch import get_lunch_client, get_lunch_client_for_chat_id
 from persistence import get_db
 from utils import Keyboard, get_chat_id
 
@@ -120,6 +121,7 @@ def get_settings_buttons() -> InlineKeyboardMarkup:
     kbd = Keyboard()
     kbd += ("Change poll interval", "changePollInterval")
     kbd += ("Change token", "registerToken")
+    kbd += ("Trigger Plaid refresh", "triggerPlaidRefresh")
     kbd += ("Log out", "logout")
     kbd += ("Done", "doneSettings")
     return kbd.build()
@@ -220,3 +222,22 @@ async def handle_logout_confirm(update: Update, _: ContextTypes.DEFAULT_TYPE):
 async def handle_logout_cancel(update: Update, _: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
     await update.callback_query.delete_message()
+
+
+async def handle_btn_trigger_plaid_refresh(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+):
+    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
+    lunch.trigger_fetch_from_plaid()
+    await context.bot.set_message_reaction(
+        chat_id=update.message.chat_id,
+        message_id=update.message.message_id,
+        reaction=ReactionEmoji.HANDSHAKE,
+    )
+
+    settings_text = get_current_settings_text(get_chat_id(update))
+    await update.callback_query.edit_message_text(
+        text=f"_Plaid refresh triggered_\n\n{settings_text}",
+        reply_markup=get_settings_buttons(),
+        parse_mode=ParseMode.MARKDOWN_V2,
+    )

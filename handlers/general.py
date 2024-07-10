@@ -205,18 +205,6 @@ async def handle_generic_message(
     return False
 
 
-async def handle_trigger_plaid_refresh(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
-    lunch = get_lunch_client_for_chat_id(update.message.chat_id)
-    lunch.trigger_fetch_from_plaid()
-    await context.bot.set_message_reaction(
-        chat_id=update.message.chat_id,
-        message_id=update.message.message_id,
-        reaction=ReactionEmoji.HANDSHAKE,
-    )
-
-
 async def clear_cache(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     get_db().nuke(update.message.chat_id)
     await context.bot.set_message_reaction(

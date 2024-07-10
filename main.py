@@ -25,7 +25,6 @@ from handlers.general import (
     handle_errors,
     handle_generic_message,
     handle_start,
-    handle_trigger_plaid_refresh,
 )
 from handlers.transactions import (
     check_pending_transactions,
@@ -50,6 +49,7 @@ from manual_tx import setup_manual_tx_handler
 from handlers.settings import (
     handle_btn_change_poll_interval,
     handle_btn_done_settings,
+    handle_btn_trigger_plaid_refresh,
     handle_logout,
     handle_logout_cancel,
     handle_logout_confirm,
@@ -83,7 +83,6 @@ def setup_handlers(config):
     app.add_handler(CommandHandler("register", handle_register_token))
     app.add_handler(CommandHandler("review_transactions", handle_check_transactions))
     app.add_handler(CommandHandler("pending_transactions", check_pending_transactions))
-    app.add_handler(CommandHandler("refresh", handle_trigger_plaid_refresh))
     app.add_handler(CommandHandler("show_budget", handle_show_budget))
     app.add_handler(CommandHandler("clear_cache", clear_cache))
     app.add_handler(CommandHandler("settings", handle_settings))
@@ -163,6 +162,12 @@ def setup_handlers(config):
     app.add_handler(
         CallbackQueryHandler(
             handle_btn_accounts_balances, pattern=r"^accountsBalances_"
+        )
+    )
+
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_btn_trigger_plaid_refresh, pattern=r"^triggerPlaidRefresh$"
         )
     )
 
