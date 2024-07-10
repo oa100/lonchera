@@ -8,7 +8,7 @@ from telegram.constants import ReactionEmoji
 
 from handlers.expectations import EXPECTING_TOKEN, set_expectation
 from lunch import get_lunch_client, get_lunch_client_for_chat_id
-from persistence import get_db
+from persistence import Settings, get_db
 from utils import Keyboard, get_chat_id
 
 
@@ -113,14 +113,22 @@ def get_current_settings_text(chat_id: int) -> Optional[str]:
 
 *Poll interval*: {poll_interval} {next_poll_at}
 
+*Auto\-mark transactions as reviewed*: {"☑️" if settings.auto_mark_reviewed else "☐"}
+> When enabled, transactions will be marked as reviewed automatically after being sent to Telegram\.
+> When disabled, you need to explicitly mark them as reviewed\.
+
 *API token*: ||{settings.token}||"""
     )
 
 
-def get_settings_buttons() -> InlineKeyboardMarkup:
+def get_settings_buttons(settings: Settings) -> InlineKeyboardMarkup:
     kbd = Keyboard()
     kbd += ("Change poll interval", "changePollInterval")
     kbd += ("Change token", "registerToken")
+    kbd += (
+        "Toggle auto-mark reviewed",
+        f"toggleAutoMarkReviewed_{settings.auto_mark_reviewed}",
+    )
     kbd += ("Trigger Plaid refresh", "triggerPlaidRefresh")
     kbd += ("Log out", "logout")
     kbd += ("Done", "doneSettings")
@@ -129,16 +137,17 @@ def get_settings_buttons() -> InlineKeyboardMarkup:
 
 async def handle_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends a message with the current settings."""
-    settings_text = get_current_settings_text(update.message.chat_id)
+    settings_text = get_current_settings_text(update.effective_chat.id)
     if settings_text is None:
         await update.message.reply_text(
             text="No settings found for this chat. Did you register a token?",
         )
         return
 
+    settings = get_db().get_current_settings(update.effective_chat.id)
     await update.message.reply_text(
         text=settings_text,
-        reply_markup=get_settings_buttons(),
+        reply_markup=get_settings_buttons(settings),
         parse_mode=ParseMode.MARKDOWN_V2,
     )
 
@@ -158,6 +167,22 @@ async def handle_btn_set_token_from_button(
     )
 
 
+async def handle_btn_toggle_auto_mark_reviewed(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+):
+    settings = get_db().get_current_settings(get_chat_id(update))
+    get_db().update_auto_mark_reviewed(
+        get_chat_id(update), not settings.auto_mark_reviewed
+    )
+
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(
+        text=get_current_settings_text(update.effective_chat.id),
+        reply_markup=get_settings_buttons(settings),
+        parse_mode=ParseMode.MARKDOWN_V2,
+    )
+
+
 async def handle_btn_change_poll_interval(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ):
@@ -165,9 +190,10 @@ async def handle_btn_change_poll_interval(
     if "_" in update.callback_query.data:
         poll_interval = int(update.callback_query.data.split("_")[1])
         get_db().update_poll_interval(get_chat_id(update), poll_interval)
+        settings = get_db().get_current_settings(get_chat_id(update))
         await update.callback_query.edit_message_text(
             text=f"_Poll interval updated_\n\n{get_current_settings_text(get_chat_id(update))}",
-            reply_markup=get_settings_buttons(),
+            reply_markup=get_settings_buttons(settings),
             parse_mode=ParseMode.MARKDOWN_V2,
         )
     else:
@@ -236,8 +262,9 @@ async def handle_btn_trigger_plaid_refresh(
     )
 
     settings_text = get_current_settings_text(get_chat_id(update))
+    settings = get_db().get_current_settings(get_chat_id(update))
     await update.callback_query.edit_message_text(
         text=f"_Plaid refresh triggered_\n\n{settings_text}",
-        reply_markup=get_settings_buttons(),
+        reply_markup=get_settings_buttons(settings),
         parse_mode=ParseMode.MARKDOWN_V2,
     )

@@ -43,6 +43,7 @@ class Settings(Base):
     poll_interval_secs = Column(Integer, default=3600, nullable=False)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     last_poll_at = Column(DateTime)
+    auto_mark_reviewed = Column(Boolean, default=False, nullable=False)
 
 
 class Persistence:
@@ -188,6 +189,16 @@ class Persistence:
         with self.Session() as session:
             session.query(Settings).filter_by(chat_id=chat_id).delete()
             session.query(Transaction).filter_by(chat_id=chat_id).delete()
+            session.commit()
+
+    def update_auto_mark_reviewed(self, chat_id: int, auto_mark_reviewed: bool) -> None:
+        with self.Session() as session:
+            stmt = (
+                update(Settings)
+                .where(Settings.chat_id == chat_id)
+                .values(auto_mark_reviewed=auto_mark_reviewed)
+            )
+            session.execute(stmt)
             session.commit()
 
 

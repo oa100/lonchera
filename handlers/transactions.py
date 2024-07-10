@@ -44,6 +44,7 @@ async def check_transactions_and_telegram_them(
 
     logger.info(f"Found {len(transactions)} unreviewed transactions")
 
+    settings = get_db().get_current_settings(chat_id)
     for transaction in transactions:
         if get_db().was_already_sent(transaction.id):
             logger.warning(f"Ignoring already sent transaction: {transaction.id}")
@@ -60,6 +61,12 @@ async def check_transactions_and_telegram_them(
             reply_msg_id = get_db().get_message_id_associated_with(
                 related_tx.id, chat_id
             )
+
+        if settings.auto_mark_reviewed:
+            lunch.update_transaction(
+                transaction.id, TransactionUpdateObject(status="cleared")
+            )
+            transaction.status = "cleared"
 
         msg_id = await send_transaction_message(
             context, transaction, chat_id, reply_to_message_id=reply_msg_id

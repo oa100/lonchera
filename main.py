@@ -49,6 +49,7 @@ from manual_tx import setup_manual_tx_handler
 from handlers.settings import (
     handle_btn_change_poll_interval,
     handle_btn_done_settings,
+    handle_btn_toggle_auto_mark_reviewed,
     handle_btn_trigger_plaid_refresh,
     handle_logout,
     handle_logout_cancel,
@@ -121,6 +122,11 @@ def setup_handlers(config):
     app.add_handler(CallbackQueryHandler(handle_logout, pattern=r"^logout$"))
     app.add_handler(
         CallbackQueryHandler(handle_logout_confirm, pattern=r"^logout_confirm$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_btn_toggle_auto_mark_reviewed, pattern=r"^toggleAutoMarkReviewed"
+        )
     )
     app.add_handler(
         CallbackQueryHandler(handle_logout_cancel, pattern=r"^logout_cancel$")
@@ -206,8 +212,5 @@ if __name__ == "__main__":
 
 # TODO
 # - Add custom icons for famous merchants
-# - settings:
-#   force poll
 # - when a transaction was already sent and we force poll, show a link to the message ids for those txs
-# - Add transactions manually
-# add /refresh (plaid) to settings
+# - create rule when a transaction changes category
