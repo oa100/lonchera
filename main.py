@@ -213,4 +213,6 @@ if __name__ == "__main__":
 # TODO
 # - Add custom icons for famous merchants
 # - when a transaction was already sent and we force poll, show a link to the message ids for those txs
-# - create rule when a transaction changes category
+# - add a setting to send transactions as soon as they are received,
+#   regardless of whether they are in pending state. When this is enabled,
+#   we can mark them as reviewed when they are polled again and they are no longer pending.
