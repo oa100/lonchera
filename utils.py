@@ -70,52 +70,46 @@ class Keyboard(list):
         return kbd.build()
 
 
+ACCOUNT_TYPE_EMOJIS = {
+    "credit": "💳",
+    "depository": "🏦",
+    "investment": "📈",
+    "cash": "💵",
+    "loan": "💸",
+    "real estate": "🏠",
+    "vehicle": "🚗",
+    "cryptocurrency": "₿",
+    "employee compensation": "👨‍💼",
+    "other liability": "📉",
+    "other asset": "📊",
+}
+
+
 def get_emoji_for_account_type(acct_type: str) -> str:
-    if acct_type == "credit":
-        return "💳"
-    if acct_type == "depository":
-        return "🏦"
-    if acct_type == "investment":
-        return "📈"
-    if acct_type == "cash":
-        return "💵"
-    if acct_type == "loan":
-        return "💸"
-    if acct_type == "real estate":
-        return "🏠"
-    if acct_type == "vehicle":
-        return "🚗"
-    if acct_type == "cryptocurrency":
-        return "₿"
-    if acct_type == "employee compensation":
-        return "👨‍💼"
-    if acct_type == "other liability":
-        return "📉"
-    if acct_type == "other asset":
-        return "📊"
-    return "❓"
+    return ACCOUNT_TYPE_EMOJIS.get(acct_type, "❓")
+
+
+CRYPTO_SYMBOLS = {
+    "btc": "₿",
+    "eth": "Ξ",
+    "ltc": "Ł",
+    "xrp": "X",
+    "bch": "₿",
+    "doge": "Ð",
+    "xmr": "ɱ",
+    "dash": "D",
+    "xem": "ξ",
+    "neo": "文",
+    "xlm": "*",
+    "zec": "ⓩ",
+    "ada": "₳",
+    "eos": "ε",
+    "miota": "ι",
+}
 
 
 def get_crypto_symbol(crypto_symbol: str) -> str:
-    crypto_symbols = {
-        "btc": "₿",
-        "eth": "Ξ",
-        "ltc": "Ł",
-        "xrp": "X",
-        "bch": "₿",
-        "doge": "Ð",
-        "xmr": "ɱ",
-        "dash": "D",
-        "xem": "ξ",
-        "neo": "文",
-        "xlm": "*",
-        "zec": "ⓩ",
-        "ada": "₳",
-        "eos": "ε",
-        "miota": "ι",
-    }
-
-    return crypto_symbols.get(crypto_symbol.lower(), crypto_symbol)
+    return CRYPTO_SYMBOLS.get(crypto_symbol.lower(), crypto_symbol)
 
 
 CONVERSATION_MSG_ID = "conversation_msg_id"
