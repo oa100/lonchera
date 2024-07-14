@@ -44,6 +44,7 @@ class Settings(Base):
     created_at = Column(DateTime, default=func.now(), nullable=False)
     last_poll_at = Column(DateTime)
     auto_mark_reviewed = Column(Boolean, default=False, nullable=False)
+    poll_pending = Column(Boolean, default=False, nullable=False)
 
 
 class Persistence:
@@ -72,13 +73,12 @@ class Persistence:
         with self.Session() as session:
             return [chat.chat_id for chat in session.query(Settings.chat_id).all()]
 
-    def was_already_sent(self, tx_id: int) -> bool:
+    def was_already_sent(self, tx_id: int, pending: bool = False) -> bool:
         with self.Session() as session:
-            # select all rows where tx_id is equal to the tx_id,
-            # but ignore rows where pending is True
+            # select all rows where tx_id is equal to the tx_id
             return (
                 session.query(Transaction.message_id)
-                .filter_by(tx_id=tx_id, pending=False)
+                .filter_by(tx_id=tx_id, pending=pending)
                 .first()
                 is not None
             )
@@ -197,6 +197,16 @@ class Persistence:
                 update(Settings)
                 .where(Settings.chat_id == chat_id)
                 .values(auto_mark_reviewed=auto_mark_reviewed)
+            )
+            session.execute(stmt)
+            session.commit()
+
+    def update_poll_pending(self, chat_id: int, poll_pending: bool) -> None:
+        with self.Session() as session:
+            stmt = (
+                update(Settings)
+                .where(Settings.chat_id == chat_id)
+                .values(poll_pending=poll_pending)
             )
             session.execute(stmt)
             session.commit()

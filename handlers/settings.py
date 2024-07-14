@@ -111,11 +111,15 @@ def get_current_settings_text(chat_id: int) -> Optional[str]:
     return dedent(
         f"""🛠️ 🆂🅴🆃🆃🅸🅽🅶🆂
 
-*Poll interval*: {poll_interval} {next_poll_at}
+*Poll interval*: {poll_interval}
+> {next_poll_at}
 
 *Auto\-mark transactions as reviewed*: {"☑️" if settings.auto_mark_reviewed else "☐"}
 > When enabled, transactions will be marked as reviewed automatically after being sent to Telegram\.
 > When disabled, you need to explicitly mark them as reviewed\.
+
+*Poll pending transactions*: {"☑️" if settings.poll_pending else "☐"}
+> When enabled, the bot will also poll for pending transactions and send updates when they are cleared\.
 
 *API token*: ||{settings.token}||"""
     )
@@ -124,12 +128,13 @@ def get_current_settings_text(chat_id: int) -> Optional[str]:
 def get_settings_buttons(settings: Settings) -> InlineKeyboardMarkup:
     kbd = Keyboard()
     kbd += ("Change poll interval", "changePollInterval")
-    kbd += ("Change token", "registerToken")
     kbd += (
         "Toggle auto-mark reviewed",
         f"toggleAutoMarkReviewed_{settings.auto_mark_reviewed}",
     )
+    kbd += ("Toggle poll pending", f"togglePollPending_{settings.poll_pending}")
     kbd += ("Trigger Plaid refresh", "triggerPlaidRefresh")
+    kbd += ("Change token", "registerToken")
     kbd += ("Log out", "logout")
     kbd += ("Done", "doneSettings")
     return kbd.build()
@@ -265,6 +270,18 @@ async def handle_btn_trigger_plaid_refresh(
     settings = get_db().get_current_settings(get_chat_id(update))
     await update.callback_query.edit_message_text(
         text=f"_Plaid refresh triggered_\n\n{settings_text}",
+        reply_markup=get_settings_buttons(settings),
+        parse_mode=ParseMode.MARKDOWN_V2,
+    )
+
+
+async def handle_btn_toggle_poll_pending(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    settings = get_db().get_current_settings(get_chat_id(update))
+    get_db().update_poll_pending(get_chat_id(update), not settings.poll_pending)
+
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(
+        text=get_current_settings_text(update.effective_chat.id),
         reply_markup=get_settings_buttons(settings),
         parse_mode=ParseMode.MARKDOWN_V2,
     )
