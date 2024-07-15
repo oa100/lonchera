@@ -11,7 +11,6 @@ from budget_messaging import (
     show_bugdget_for_category,
 )
 from lunch import get_lunch_client_for_chat_id
-from utils import get_chat_id
 
 logger = logging.getLogger("budget_handler")
 
@@ -65,7 +64,7 @@ async def handle_show_budget(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else:
         budget_date, budget_end_date = get_default_budget_range()
 
-    lunch = get_lunch_client_for_chat_id(get_chat_id(update))
+    lunch = get_lunch_client_for_chat_id(update.effective_chat.id)
     logger.info("Pulling budget...")
 
     budget = lunch.get_budgets(start_date=budget_date, end_date=budget_end_date)

@@ -19,7 +19,7 @@ from lunchable.models import TransactionObject
 
 from persistence import get_db
 from tx_messaging import get_tx_buttons, send_plaid_details, send_transaction_message
-from utils import Keyboard, find_related_tx, get_chat_id
+from utils import Keyboard, find_related_tx
 
 logger = logging.getLogger("tx_handler")
 
@@ -151,7 +151,7 @@ async def check_pending_transactions(
 ) -> None:
     transactions = await check_pending_transactions_and_telegram_them(
         context,
-        chat_id=get_chat_id(update),
+        chat_id=update.effective_chat.id,
     )
 
     if not transactions:
@@ -444,13 +444,13 @@ async def handle_rename_payee(update: Update, context: ContextTypes.DEFAULT_TYPE
     transaction_id = int(update.callback_query.data.split("_")[1])
     await update.callback_query.answer()
     await context.bot.send_message(
-        chat_id=get_chat_id(update),
+        chat_id=update.effective_chat.id,
         text="Please enter the new payee name:",
         reply_to_message_id=update.callback_query.message.message_id,
         reply_markup=ForceReply(),
     )
     set_expectation(
-        get_chat_id(update),
+        update.effective_chat.id,
         {
             "expectation": RENAME_PAYEE,
             "msg_id": str(update.callback_query.message.message_id),
@@ -463,7 +463,7 @@ async def handle_edit_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     transaction_id = int(update.callback_query.data.split("_")[1])
     await update.callback_query.answer()
     await context.bot.send_message(
-        chat_id=get_chat_id(update),
+        chat_id=update.effective_chat.id,
         text=dedent(
             """
             Please enter notes for this transaction.\n\n
@@ -474,7 +474,7 @@ async def handle_edit_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ForceReply(),
     )
     set_expectation(
-        get_chat_id(update),
+        update.effective_chat.id,
         {
             "expectation": EDIT_NOTES,
             "msg_id": str(update.callback_query.message.message_id),
@@ -487,7 +487,7 @@ async def handle_set_tags(update: Update, context: ContextTypes.DEFAULT_TYPE):
     transaction_id = int(update.callback_query.data.split("_")[1])
     await update.callback_query.answer()
     await context.bot.send_message(
-        chat_id=get_chat_id(update),
+        chat_id=update.effective_chat.id,
         text=dedent(
             """
             Please enter the tags for this transaction\n\n
@@ -500,7 +500,7 @@ async def handle_set_tags(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ForceReply(),
     )
     set_expectation(
-        get_chat_id(update),
+        update.effective_chat.id,
         {
             "expectation": SET_TAGS,
             "msg_id": str(update.callback_query.message.message_id),

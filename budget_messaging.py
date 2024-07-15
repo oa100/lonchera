@@ -8,7 +8,7 @@ from lunchable.models import BudgetObject
 
 from typing import List, Optional
 
-from utils import Keyboard, get_chat_id, make_tag
+from utils import Keyboard, make_tag
 
 logger = logging.getLogger("messaging")
 
@@ -121,7 +121,7 @@ async def send_budget(
 
     if message_id:
         await context.bot.edit_message_text(
-            chat_id=get_chat_id(update),
+            chat_id=update.effective_chat.id,
             message_id=message_id,
             text=msg,
             parse_mode=ParseMode.MARKDOWN,
@@ -129,7 +129,7 @@ async def send_budget(
         )
     else:
         await context.bot.send_message(
-            chat_id=get_chat_id(update),
+            chat_id=update.effective_chat.id,
             text=msg,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=get_bugdet_buttons(first_day_of_budget),

@@ -36,17 +36,6 @@ def find_related_tx(
     return None
 
 
-# TODO replace with update.effective_chat.id
-def get_chat_id(update: Update) -> int:
-    if update.message:
-        return update.message.chat_id
-
-    if update.callback_query:
-        return update.callback_query.message.chat.id
-
-    raise ValueError(f"Could not find chat_id in {update}")
-
-
 class Keyboard(list):
     def __iadd__(self, other):
         self.append(other)

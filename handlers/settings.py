@@ -9,7 +9,7 @@ from telegram.constants import ReactionEmoji
 from handlers.expectations import EXPECTING_TOKEN, set_expectation
 from lunch import get_lunch_client, get_lunch_client_for_chat_id
 from persistence import Settings, get_db
-from utils import Keyboard, get_chat_id
+from utils import Keyboard
 
 
 async def handle_register_token(
@@ -22,7 +22,7 @@ async def handle_register_token(
             text="Please provide a token to register",
         )
         set_expectation(
-            get_chat_id(update),
+            update.effective_chat.id,
             {
                 "expectation": EXPECTING_TOKEN,
                 "msg_id": msg.message_id,
@@ -165,7 +165,7 @@ async def handle_btn_set_token_from_button(
         text="Please provide a token to register",
     )
     set_expectation(
-        get_chat_id(update),
+        update.effective_chat.id,
         {
             "expectation": EXPECTING_TOKEN,
             "msg_id": msg.message_id,
@@ -176,9 +176,9 @@ async def handle_btn_set_token_from_button(
 async def handle_btn_toggle_auto_mark_reviewed(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ):
-    settings = get_db().get_current_settings(get_chat_id(update))
+    settings = get_db().get_current_settings(update.effective_chat.id)
     get_db().update_auto_mark_reviewed(
-        get_chat_id(update), not settings.auto_mark_reviewed
+        update.effective_chat.id, not settings.auto_mark_reviewed
     )
 
     await update.callback_query.answer()
@@ -195,10 +195,10 @@ async def handle_btn_change_poll_interval(
     """Changes the poll interval for the chat."""
     if "_" in update.callback_query.data:
         poll_interval = int(update.callback_query.data.split("_")[1])
-        get_db().update_poll_interval(get_chat_id(update), poll_interval)
-        settings = get_db().get_current_settings(get_chat_id(update))
+        get_db().update_poll_interval(update.effective_chat.id, poll_interval)
+        settings = get_db().get_current_settings(update.effective_chat.id)
         await update.callback_query.edit_message_text(
-            text=f"_Poll interval updated_\n\n{get_current_settings_text(get_chat_id(update))}",
+            text=f"_Poll interval updated_\n\n{get_current_settings_text(update.effective_chat.id)}",
             reply_markup=get_settings_buttons(settings),
             parse_mode=ParseMode.MARKDOWN_V2,
         )
@@ -220,7 +220,7 @@ async def handle_btn_change_poll_interval(
 async def handle_btn_done_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # delete message
     await context.bot.delete_message(
-        chat_id=get_chat_id(update),
+        chat_id=update.effective_chat.id,
         message_id=update.callback_query.message.message_id,
     )
 
@@ -243,7 +243,7 @@ async def handle_logout(update: Update, _: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_logout_confirm(update: Update, _: ContextTypes.DEFAULT_TYPE):
-    get_db().logout(get_chat_id(update))
+    get_db().logout(update.effective_chat.id)
 
     await update.callback_query.delete_message()
     await update.callback_query.answer(
@@ -267,8 +267,8 @@ async def handle_btn_trigger_plaid_refresh(
         reaction=ReactionEmoji.HANDSHAKE,
     )
 
-    settings_text = get_current_settings_text(get_chat_id(update))
-    settings = get_db().get_current_settings(get_chat_id(update))
+    settings_text = get_current_settings_text(update.effective_chat.id)
+    settings = get_db().get_current_settings(update.effective_chat.id)
     await update.callback_query.edit_message_text(
         text=f"_Plaid refresh triggered_\n\n{settings_text}",
         reply_markup=get_settings_buttons(settings),
@@ -277,8 +277,8 @@ async def handle_btn_trigger_plaid_refresh(
 
 
 async def handle_btn_toggle_poll_pending(update: Update, _: ContextTypes.DEFAULT_TYPE):
-    settings = get_db().get_current_settings(get_chat_id(update))
-    get_db().update_poll_pending(get_chat_id(update), not settings.poll_pending)
+    settings = get_db().get_current_settings(update.effective_chat.id)
+    get_db().update_poll_pending(update.effective_chat.id, not settings.poll_pending)
 
     await update.callback_query.answer()
     await update.callback_query.edit_message_text(

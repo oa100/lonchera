@@ -20,7 +20,6 @@ from handlers.expectations import (
 )
 from persistence import get_db
 from tx_messaging import send_transaction_message
-from utils import get_chat_id
 
 logger = logging.getLogger("handlers")
 
@@ -49,7 +48,7 @@ async def handle_errors(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if isinstance(context.error, NoLunchToken):
         await context.bot.send_message(
-            chat_id=get_chat_id(update),
+            chat_id=update.effective_chat.id,
             text=dedent(
                 """
                 No token registered for this chat. Please register a token using:
@@ -62,7 +61,7 @@ async def handle_errors(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if os.environ.get("DEBUG"):
         error = context.error
         await context.bot.send_message(
-            chat_id=get_chat_id(update),
+            chat_id=update.effective_chat.id,
             text=dedent(
                 f"""
                 An error occurred:
@@ -83,21 +82,21 @@ async def handle_generic_message(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> bool:
     # if waiting for a token, register it
-    expectation = get_expectation(get_chat_id(update))
+    expectation = get_expectation(update.effective_chat.id)
     if expectation and expectation["expectation"] == EXPECTING_TOKEN:
-        clear_expectation(get_chat_id(update))
+        clear_expectation(update.effective_chat.id)
 
         await context.bot.delete_message(
-            chat_id=get_chat_id(update), message_id=expectation["msg_id"]
+            chat_id=update.effective_chat.id, message_id=expectation["msg_id"]
         )
 
         await handle_register_token(update, context, token_override=update.message.text)
         return True
     elif expectation and expectation["expectation"] == RENAME_PAYEE:
-        clear_expectation(get_chat_id(update))
+        clear_expectation(update.effective_chat.id)
 
         # updates the transaction with the new payee
-        lunch = get_lunch_client_for_chat_id(get_chat_id(update))
+        lunch = get_lunch_client_for_chat_id(update.effective_chat.id)
         transaction_id = int(expectation["transaction_id"])
         lunch.update_transaction(
             transaction_id, TransactionUpdateObject(payee=update.message.text)
@@ -109,7 +108,7 @@ async def handle_generic_message(
         await send_transaction_message(
             context=context,
             transaction=updated_transaction,
-            chat_id=get_chat_id(update),
+            chat_id=update.effective_chat.id,
             message_id=msg_id,
         )
 
@@ -121,10 +120,10 @@ async def handle_generic_message(
         )
         return True
     elif expectation and expectation["expectation"] == EDIT_NOTES:
-        clear_expectation(get_chat_id(update))
+        clear_expectation(update.effective_chat.id)
 
         # updates the transaction with the new notes
-        lunch = get_lunch_client_for_chat_id(get_chat_id(update))
+        lunch = get_lunch_client_for_chat_id(update.effective_chat.id)
         transaction_id = int(expectation["transaction_id"])
         lunch.update_transaction(
             transaction_id, TransactionUpdateObject(notes=update.message.text)
@@ -136,7 +135,7 @@ async def handle_generic_message(
         await send_transaction_message(
             context=context,
             transaction=updated_transaction,
-            chat_id=get_chat_id(update),
+            chat_id=update.effective_chat.id,
             message_id=msg_id,
         )
 
@@ -157,7 +156,7 @@ async def handle_generic_message(
 
         if not message_are_tags:
             await context.bot.send_message(
-                chat_id=get_chat_id(update),
+                chat_id=update.effective_chat.id,
                 text=dedent(
                     """
                     The message should only contain words suffixed with a hashtag `#`.
@@ -168,10 +167,10 @@ async def handle_generic_message(
             )
             return True
 
-        clear_expectation(get_chat_id(update))
+        clear_expectation(update.effective_chat.id)
 
         # updates the transaction with the new notes
-        lunch = get_lunch_client_for_chat_id(get_chat_id(update))
+        lunch = get_lunch_client_for_chat_id(update.effective_chat.id)
         transaction_id = int(expectation["transaction_id"])
 
         tags_without_hashtag = [
@@ -190,7 +189,7 @@ async def handle_generic_message(
         await send_transaction_message(
             context=context,
             transaction=updated_transaction,
-            chat_id=get_chat_id(update),
+            chat_id=update.effective_chat.id,
             message_id=msg_id,
         )
 

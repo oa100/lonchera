@@ -7,7 +7,6 @@ from lunch import get_lunch_client_for_chat_id
 from lunchable.models import PlaidAccountObject, AssetsObject, CryptoObject
 from utils import (
     Keyboard,
-    get_chat_id,
     get_crypto_symbol,
     get_emoji_for_account_type,
     make_tag,
@@ -156,7 +155,7 @@ async def handle_show_balances(
     message_id: Optional[int] = None,
 ):
     """Shows all the Plaid accounts and its balances to the user."""
-    lunch = get_lunch_client_for_chat_id(get_chat_id(update))
+    lunch = get_lunch_client_for_chat_id(update.effective_chat.id)
 
     all_accounts = []
     if is_show_balances(mask):
@@ -172,7 +171,7 @@ async def handle_show_balances(
 
     if message_id:
         await context.bot.edit_message_text(
-            chat_id=get_chat_id(update),
+            chat_id=update.effective_chat.id,
             message_id=message_id,
             text=msg,
             parse_mode=ParseMode.MARKDOWN,
@@ -180,7 +179,7 @@ async def handle_show_balances(
         )
     else:
         await context.bot.send_message(
-            chat_id=get_chat_id(update),
+            chat_id=update.effective_chat.id,
             text=msg,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=get_accounts_buttons(mask),
