@@ -104,15 +104,16 @@ def get_current_settings_text(chat_id: int) -> Optional[str]:
         if last_poll:
             next_poll_at = last_poll + timedelta(seconds=settings.poll_interval_secs)
             next_poll_at = (
-                f"\n    Next poll at `{next_poll_at.strftime('%a, %b %d at %I:%M %p')}`"
+                f"> Next poll at `{next_poll_at.strftime('%a, %b %d at %I:%M %p')}`"
             )
-    next_poll_at += "\n    Trigger now: /review\\_transactions"
+    next_poll_at += "\n> Trigger now: /review\\_transactions"
 
     return dedent(
         f"""🛠️ 🆂🅴🆃🆃🅸🅽🅶🆂
 
 *Poll interval*: {poll_interval}
-> {next_poll_at}
+> This is how often we check for new transactions\.
+{next_poll_at}
 
 *Auto\-mark transactions as reviewed*: {"☑️" if settings.auto_mark_reviewed else "☐"}
 > When enabled, transactions will be marked as reviewed automatically after being sent to Telegram\.
