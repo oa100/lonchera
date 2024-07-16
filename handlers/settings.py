@@ -106,23 +106,24 @@ def get_current_settings_text(chat_id: int) -> Optional[str]:
             next_poll_at = (
                 f"> Next poll at `{next_poll_at.strftime('%a, %b %d at %I:%M %p')}`"
             )
-    next_poll_at += "\n> Trigger now: /review\\_transactions"
 
     return dedent(
-        f"""🛠️ 🆂🅴🆃🆃🅸🅽🅶🆂
+        f"""
+        🛠️ 🆂🅴🆃🆃🅸🅽🅶🆂
+        *Poll interval*: {poll_interval}
+        > This is how often we check for new transactions\.
+        {next_poll_at}
+        > Trigger now: /review\\_transactions
 
-*Poll interval*: {poll_interval}
-> This is how often we check for new transactions\.
-{next_poll_at}
+        *Auto\-mark transactions as reviewed*: {"☑️" if settings.auto_mark_reviewed else "☐"}
+        > When enabled, transactions will be marked as reviewed automatically after being sent to Telegram\.
+        > When disabled, you need to explicitly mark them as reviewed\.
 
-*Auto\-mark transactions as reviewed*: {"☑️" if settings.auto_mark_reviewed else "☐"}
-> When enabled, transactions will be marked as reviewed automatically after being sent to Telegram\.
-> When disabled, you need to explicitly mark them as reviewed\.
+        *Poll pending transactions*: {"☑️" if settings.poll_pending else "☐"}
+        > When enabled, the bot will also poll for pending transactions and send updates when they are cleared\.
 
-*Poll pending transactions*: {"☑️" if settings.poll_pending else "☐"}
-> When enabled, the bot will also poll for pending transactions and send updates when they are cleared\.
-
-*API token*: ||{settings.token}||"""
+        *API token*: ||{settings.token}||
+        """
     )
 
 
