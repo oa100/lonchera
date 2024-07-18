@@ -33,6 +33,7 @@ class Transaction(Base):
     created_at = Column(DateTime, default=func.now(), nullable=False)
     reviewed_at = Column(DateTime)
     recurring_type = Column(String)
+    plaid_id = Column(String, default=None, nullable=True)
 
 
 class Settings(Base):
@@ -75,10 +76,20 @@ class Persistence:
 
     def was_already_sent(self, tx_id: int, pending: bool = False) -> bool:
         with self.Session() as session:
-            # select all rows where tx_id is equal to the tx_id
             return (
                 session.query(Transaction.message_id)
                 .filter_by(tx_id=tx_id, pending=pending)
+                .first()
+                is not None
+            )
+
+    def was_already_sent_by_plaid_id(self, plaid_id: Optional[str]) -> bool:
+        if plaid_id is None:
+            return False
+        with self.Session() as session:
+            return (
+                session.query(Transaction.message_id)
+                .filter_by(plaid_id=plaid_id)
                 .first()
                 is not None
             )
@@ -91,6 +102,7 @@ class Persistence:
         recurring_type: Optional[str],
         pending=False,
         reviewed=False,
+        plaid_id: Optional[str] = None,
     ) -> None:
         logger.info(f"Marking transaction {tx_id} as sent with message ID {message_id}")
         with self.Session() as session:
@@ -101,6 +113,7 @@ class Persistence:
                 pending=pending,
                 recurring_type=recurring_type,
                 reviewed_at=datetime.now() if reviewed else None,
+                plaid_id=plaid_id,
             )
             session.add(new_transaction)
             session.commit()
@@ -117,6 +130,12 @@ class Persistence:
     def get_tx_by_id(self, tx_id: int) -> Optional[Transaction]:
         with self.Session() as session:
             return session.query(Transaction).filter_by(tx_id=tx_id).first()
+
+    def get_tx_by_plaid_id(self, plaid_id: Optional[str]) -> Optional[Transaction]:
+        if plaid_id is None:
+            return None
+        with self.Session() as session:
+            return session.query(Transaction).filter_by(plaid_id=plaid_id).first()
 
     def get_message_id_associated_with(self, tx_id: int, chat_id: int) -> Optional[int]:
         with self.Session() as session:
@@ -218,5 +237,5 @@ db = None
 def get_db() -> Persistence:
     global db
     if db is None:
-        db = Persistence(os.getenv("DB_PATH", "lunchable.db"))
+        db = Persistence(os.getenv("DB_PATH", "lonchera.db"))
     return db

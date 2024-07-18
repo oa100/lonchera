@@ -76,6 +76,7 @@ async def send_transaction_message(
     chat_id: Union[str, int],
     message_id: Optional[int] = None,
     reply_to_message_id: Optional[int] = None,
+    posted_at: Optional[datetime] = None,
 ) -> int:
     """Sends a message to the chat_id with the details of a transaction.
     If message_id is provided, edits the existing"""
@@ -141,6 +142,8 @@ async def send_transaction_message(
         message += f"*Tags*: {', '.join(tags)}\n"
     if transaction.is_pending:
         message += "\n_This is a pending transaction_\n"
+    if posted_at:
+        message += f"\nPosted at: {posted_at.strftime('%a, %b %d at %I:%M %p')}\n"
 
     logger.info(f"Sending message to chat_id {chat_id}: {message}")
     if message_id:

@@ -454,6 +454,7 @@ async def save_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg_id,
         transaction.recurring_type,
         reviewed=True,
+        plaid_id=transaction.plaid_metadata.get("transaction_id", None),
     )
 
     return ConversationHandler.END

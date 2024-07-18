@@ -46,17 +46,48 @@ async def check_transactions_and_telegram_them(
 
     settings = get_db().get_current_settings(chat_id)
     for transaction in transactions:
-        if get_db().was_already_sent(transaction.id):
-            tx = get_db().get_tx_by_id(transaction.id)
+        if settings.auto_mark_reviewed:
+            lunch.update_transaction(
+                transaction.id, TransactionUpdateObject(status="cleared")
+            )
+            transaction.status = "cleared"
+
+        if get_db().was_already_sent(
+            transaction.id
+        ) or get_db().was_already_sent_by_plaid_id(
+            transaction.plaid_metadata["transaction_id"]
+        ):
+            tx = get_db().get_tx_by_plaid_id(
+                transaction.plaid_metadata["transaction_id"]
+            ) or get_db().get_tx_by_id(transaction.id)
             if tx.pending and not transaction.is_pending:
                 # Transaction was previously sent as pending and is now cleared
                 msg_id = tx.message_id
+                logger.info(
+                    f"Transaction {transaction.id} was previously sent as pending, "
+                    "but is now cleared. Updating message..."
+                )
                 await context.bot.send_message(
                     chat_id=chat_id,
                     text=f"Transaction {transaction.id} is now cleared.",
                     reply_to_message_id=msg_id,
                 )
-                await send_transaction_message(context, transaction, chat_id, msg_id)
+                await send_transaction_message(
+                    context,
+                    transaction,
+                    chat_id,
+                    msg_id,
+                    posted_at=datetime.now(),
+                )
+                get_db().mark_as_sent(
+                    transaction.id,
+                    chat_id,
+                    msg_id,
+                    transaction.recurring_type,
+                    pending=False,
+                    reviewed=settings.auto_mark_reviewed,
+                    plaid_id=transaction.plaid_metadata.get("transaction_id", None),
+                )
             continue
 
         # check if the current transaction is related to a previously sent one
@@ -71,17 +102,15 @@ async def check_transactions_and_telegram_them(
                 related_tx.id, chat_id
             )
 
-        if settings.auto_mark_reviewed:
-            lunch.update_transaction(
-                transaction.id, TransactionUpdateObject(status="cleared")
-            )
-            transaction.status = "cleared"
-
         msg_id = await send_transaction_message(
             context, transaction, chat_id, reply_to_message_id=reply_msg_id
         )
         get_db().mark_as_sent(
-            transaction.id, chat_id, msg_id, transaction.recurring_type
+            transaction.id,
+            chat_id,
+            msg_id,
+            transaction.recurring_type,
+            plaid_id=transaction.plaid_metadata.get("transaction_id", None),
         )
 
     return transactions
@@ -116,7 +145,12 @@ async def check_pending_transactions_and_telegram_them(
             continue
         msg_id = await send_transaction_message(context, transaction, chat_id)
         get_db().mark_as_sent(
-            transaction.id, chat_id, msg_id, transaction.recurring_type, pending=True
+            transaction.id,
+            chat_id,
+            msg_id,
+            transaction.recurring_type,
+            pending=True,
+            plaid_id=transaction.plaid_metadata.get("transaction_id", None),
         )
 
     return transactions
@@ -269,6 +303,7 @@ async def handle_btn_dump_plaid_details(
     transaction = lunch.get_transaction(transaction_id)
     plaid_metadata = transaction.plaid_metadata
     plaid_details = "*Plaid Metadata*\n\n"
+    plaid_details += f"*Transaction ID:* {transaction_id}\n"
     for key, value in plaid_metadata.items():
         if value is not None:
             plaid_details += f"*{key}:* `{value}`\n"
