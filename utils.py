@@ -16,7 +16,13 @@ def is_emoji(char):
     return char in emoji.EMOJI_DATA
 
 
-def make_tag(t: str, title=False):
+def make_tag(t: str, title=False, tagging=True):
+    if not tagging:
+        if title:
+            return f"*{t}*"
+        else:
+            return t
+
     tag = "".join([char for char in t if char not in emoji.EMOJI_DATA])
     tag = tag.title().replace(" ", "").replace(".", "").strip()
 

@@ -128,6 +128,10 @@ def get_current_settings_text(chat_id: int) -> Optional[str]:
         > When disabled, shows only the date without the time\.
         > _We allow disabling time because more often than it is not reliable\._
 
+        *Tagging*: {"☑️" if settings.tagging else "☐"}
+        > When enabled, renders categories as Telegram tags.
+        > Useful for filtering transactions\.
+
         *API token*: ||{settings.token}||
         """
     )
@@ -142,6 +146,7 @@ def get_settings_buttons(settings: Settings) -> InlineKeyboardMarkup:
     )
     kbd += ("Toggle poll pending", f"togglePollPending_{settings.poll_pending}")
     kbd += ("Toggle show date/time", f"toggleShowDateTime_{settings.show_datetime}")
+    kbd += ("Toggle tagging", f"toggleTagging_{settings.tagging}")
     kbd += ("Trigger Plaid refresh", "triggerPlaidRefresh")
     kbd += ("Change token", "registerToken")
     kbd += ("Log out", "logout")
@@ -305,6 +310,19 @@ async def handle_btn_toggle_show_datetime(update: Update, _: ContextTypes.DEFAUL
     settings = get_db().get_current_settings(update.effective_chat.id)
 
     get_db().update_show_datetime(update.effective_chat.id, not settings.show_datetime)
+
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(
+        text=get_current_settings_text(update.effective_chat.id),
+        reply_markup=get_settings_buttons(settings),
+        parse_mode=ParseMode.MARKDOWN_V2,
+    )
+
+
+async def handle_btn_toggle_tagging(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    settings = get_db().get_current_settings(update.effective_chat.id)
+
+    get_db().update_tagging(update.effective_chat.id, not settings.tagging)
 
     await update.callback_query.answer()
     await update.callback_query.edit_message_text(

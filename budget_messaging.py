@@ -8,6 +8,7 @@ from lunchable.models import BudgetObject
 
 from typing import List, Optional
 
+from persistence import get_db
 from utils import Keyboard, make_tag
 
 logger = logging.getLogger("messaging")
@@ -69,7 +70,9 @@ def get_budget_category_buttons(
     return kbd.build(columns=3)
 
 
-def build_budget_message(budget: List[BudgetObject], budget_date: datetime):
+def build_budget_message(
+    budget: List[BudgetObject], budget_date: datetime, tagging: bool = True
+):
     msg = ""
     total_budget = 0
     total_spent = 0
@@ -98,7 +101,7 @@ def build_budget_message(budget: List[BudgetObject], budget_date: datetime):
 
             # split the category group into two: the first emoji and the rest of the string
             emoji, cat_name = budget_item.category_name.split(" ", 1)
-            cat_name = make_tag(cat_name)
+            cat_name = make_tag(cat_name, tagging=tagging)
 
             msg += f"{emoji} `[{bar}]{extra}`\n"
             msg += f"{cat_name} - `{spent_already:.1f}` of `{budgeted:.1f}`"
@@ -117,7 +120,10 @@ async def send_budget(
     first_day_of_budget: datetime,
     message_id: Optional[int],
 ) -> None:
-    msg = build_budget_message(budget, first_day_of_budget)
+    settings = get_db().get_current_settings(update.effective_chat.id)
+    tagging = settings.tagging if settings else True
+
+    msg = build_budget_message(budget, first_day_of_budget, tagging=tagging)
 
     if message_id:
         await context.bot.edit_message_text(
@@ -159,7 +165,10 @@ async def show_budget_categories(
 async def hide_budget_categories(
     update: Update, budget: List[BudgetObject], budget_date: datetime
 ) -> None:
-    msg = build_budget_message(budget, budget_date)
+    settings = get_db().get_current_settings(update.effective_chat.id)
+    tagging = settings.tagging if settings else True
+
+    msg = build_budget_message(budget, budget_date, tagging=tagging)
     query = update.callback_query
     await query.edit_message_text(
         text=msg,

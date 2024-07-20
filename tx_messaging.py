@@ -82,6 +82,7 @@ async def send_transaction_message(
     If message_id is provided, edits the existing"""
     settings = get_db().get_current_settings(chat_id)
     show_datetime = settings.show_datetime if settings else True
+    tagging = settings.tagging if settings else True
 
     # Get the datetime from plaid_metadata
     if transaction.plaid_metadata:
@@ -112,7 +113,7 @@ async def send_transaction_message(
     if category_group is None:
         category_group = "*No Category Group*"
     else:
-        category_group = make_tag(category_group, title=True)
+        category_group = make_tag(category_group, title=True, tagging=tagging)
 
     recurring = ""
     if transaction.recurring_type:
@@ -137,14 +138,14 @@ async def send_transaction_message(
     message += f"*Date/Time*: {formatted_date_time}\n"
 
     category_name = transaction.category_name or "Uncategorized"
-    message += f"*Category*: {make_tag(category_name)} \n"
+    message += f"*Category*: {make_tag(category_name, tagging=tagging)} \n"
 
     acct_name = (
         transaction.plaid_account_display_name
         or transaction.account_display_name
         or "Unknown Account"
     )
-    message += f"*Account*: {make_tag(acct_name)}\n"
+    message += f"*Account*: {make_tag(acct_name, tagging=tagging)}\n"
     if transaction.notes:
         message += f"*Notes*: {transaction.notes}\n"
     if transaction.tags:

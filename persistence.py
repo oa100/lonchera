@@ -80,6 +80,9 @@ class Settings(Base):
     # Whether to show full date/time for transactions or just the date
     show_datetime = Column(Boolean, default=True, nullable=False)
 
+    # Whether to create tags using the make_tag function
+    tagging = Column(Boolean, default=True, nullable=False)
+
 
 class Persistence:
     def __init__(self, db_path: str):
@@ -269,6 +272,16 @@ class Persistence:
                 update(Settings)
                 .where(Settings.chat_id == chat_id)
                 .values(show_datetime=show_datetime)
+            )
+            session.execute(stmt)
+            session.commit()
+
+    def update_tagging(self, chat_id: int, tagging: bool) -> None:
+        with self.Session() as session:
+            stmt = (
+                update(Settings)
+                .where(Settings.chat_id == chat_id)
+                .values(tagging=tagging)
             )
             session.execute(stmt)
             session.commit()

@@ -5,6 +5,7 @@ from telegram.constants import ParseMode
 
 from lunch import get_lunch_client_for_chat_id
 from lunchable.models import PlaidAccountObject, AssetsObject, CryptoObject
+from persistence import get_db
 from utils import (
     Keyboard,
     get_crypto_symbol,
@@ -121,6 +122,7 @@ def get_crypto_summary_text(acct: CryptoObject, show_details: bool) -> str:
 def get_accounts_summary_text(
     accts: List[Union[PlaidAccountObject, AssetsObject, CryptoObject]],
     show_details: bool,
+    tagging: bool = True,
 ) -> str:
     """Returns a message with the accounts and their balances."""
     by_group = {}
@@ -134,7 +136,7 @@ def get_accounts_summary_text(
 
     txt = ""
     for acct_type, accts in by_group.items():
-        txt += f"{get_emoji_for_account_type(acct_type)} {make_tag(acct_type, title=True)}\n\n"
+        txt += f"{get_emoji_for_account_type(acct_type)} {make_tag(acct_type, title=True, tagging=tagging)}\n\n"
 
         for acct in accts:
             if isinstance(acct, PlaidAccountObject):
@@ -167,7 +169,12 @@ async def handle_show_balances(
     if is_show_crypto(mask):
         all_accounts += lunch.get_crypto()
 
-    msg = get_accounts_summary_text(all_accounts, is_show_details(mask))
+    settings = get_db().get_current_settings(update.effective_chat.id)
+    tagging = settings.tagging if settings else True
+
+    msg = get_accounts_summary_text(
+        all_accounts, is_show_details(mask), tagging=tagging
+    )
 
     if message_id:
         await context.bot.edit_message_text(
