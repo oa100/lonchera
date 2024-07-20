@@ -110,6 +110,7 @@ def get_current_settings_text(chat_id: int) -> Optional[str]:
     return dedent(
         f"""
         🛠️ 🆂🅴🆃🆃🅸🅽🅶🆂
+        
         *Poll interval*: {poll_interval}
         > This is how often we check for new transactions\.
         {next_poll_at}
@@ -121,6 +122,11 @@ def get_current_settings_text(chat_id: int) -> Optional[str]:
 
         *Poll pending transactions*: {"☑️" if settings.poll_pending else "☐"}
         > When enabled, the bot will also poll for pending transactions and send updates when they are cleared\.
+
+        *Show full date/time*: {"☑️" if settings.show_datetime else "☐"}
+        > When enabled, shows the full date and time for each transaction\.
+        > When disabled, shows only the date without the time\.
+        > _We allow disabling time because more often than it is not reliable\._
 
         *API token*: ||{settings.token}||
         """
@@ -135,6 +141,7 @@ def get_settings_buttons(settings: Settings) -> InlineKeyboardMarkup:
         f"toggleAutoMarkReviewed_{settings.auto_mark_reviewed}",
     )
     kbd += ("Toggle poll pending", f"togglePollPending_{settings.poll_pending}")
+    kbd += ("Toggle show date/time", f"toggleShowDateTime_{settings.show_datetime}")
     kbd += ("Trigger Plaid refresh", "triggerPlaidRefresh")
     kbd += ("Change token", "registerToken")
     kbd += ("Log out", "logout")
@@ -156,6 +163,11 @@ async def handle_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text=settings_text,
         reply_markup=get_settings_buttons(settings),
         parse_mode=ParseMode.MARKDOWN_V2,
+    )
+
+    # delete the message with the command
+    await context.bot.delete_message(
+        chat_id=update.message.chat_id, message_id=update.message.message_id
     )
 
 
@@ -280,6 +292,19 @@ async def handle_btn_trigger_plaid_refresh(
 async def handle_btn_toggle_poll_pending(update: Update, _: ContextTypes.DEFAULT_TYPE):
     settings = get_db().get_current_settings(update.effective_chat.id)
     get_db().update_poll_pending(update.effective_chat.id, not settings.poll_pending)
+
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(
+        text=get_current_settings_text(update.effective_chat.id),
+        reply_markup=get_settings_buttons(settings),
+        parse_mode=ParseMode.MARKDOWN_V2,
+    )
+
+
+async def handle_btn_toggle_show_datetime(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    settings = get_db().get_current_settings(update.effective_chat.id)
+
+    get_db().update_show_datetime(update.effective_chat.id, not settings.show_datetime)
 
     await update.callback_query.answer()
     await update.callback_query.edit_message_text(

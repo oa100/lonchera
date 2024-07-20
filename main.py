@@ -51,6 +51,7 @@ from handlers.settings import (
     handle_btn_done_settings,
     handle_btn_toggle_auto_mark_reviewed,
     handle_btn_toggle_poll_pending,
+    handle_btn_toggle_show_datetime,
     handle_btn_trigger_plaid_refresh,
     handle_logout,
     handle_logout_cancel,
@@ -181,6 +182,12 @@ def setup_handlers(config):
     app.add_handler(
         CallbackQueryHandler(
             handle_btn_toggle_poll_pending, pattern=r"^togglePollPending"
+        )
+    )
+
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_btn_toggle_show_datetime, pattern=r"^toggleShowDateTime"
         )
     )
 

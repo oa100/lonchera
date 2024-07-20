@@ -77,6 +77,9 @@ class Settings(Base):
     # Indicates whether the bot should poll for pending transactions
     poll_pending = Column(Boolean, default=False, nullable=False)
 
+    # Whether to show full date/time for transactions or just the date
+    show_datetime = Column(Boolean, default=True, nullable=False)
+
 
 class Persistence:
     def __init__(self, db_path: str):
@@ -256,6 +259,16 @@ class Persistence:
                 update(Settings)
                 .where(Settings.chat_id == chat_id)
                 .values(poll_pending=poll_pending)
+            )
+            session.execute(stmt)
+            session.commit()
+
+    def update_show_datetime(self, chat_id: int, show_datetime: bool) -> None:
+        with self.Session() as session:
+            stmt = (
+                update(Settings)
+                .where(Settings.chat_id == chat_id)
+                .values(show_datetime=show_datetime)
             )
             session.execute(stmt)
             session.commit()

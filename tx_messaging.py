@@ -80,6 +80,9 @@ async def send_transaction_message(
 ) -> int:
     """Sends a message to the chat_id with the details of a transaction.
     If message_id is provided, edits the existing"""
+    settings = get_db().get_current_settings(chat_id)
+    show_datetime = settings.show_datetime if settings else True
+
     # Get the datetime from plaid_metadata
     if transaction.plaid_metadata:
         authorized_datetime = transaction.plaid_metadata.get(
@@ -91,11 +94,18 @@ async def send_transaction_message(
             )
             pst_tz = pytz.timezone("US/Pacific")
             pst_date_time = date_time.astimezone(pst_tz)
-            formatted_date_time = pst_date_time.strftime("%a, %b %d at %I:%M %p PST")
+            if show_datetime:
+                formatted_date_time = pst_date_time.strftime(
+                    "%a, %b %d at %I:%M %p PST"
+                )
+            else:
+                formatted_date_time = transaction.date.strftime("%a, %b %d")
         else:
             formatted_date_time = transaction.plaid_metadata.get("date")
-    else:
+    elif show_datetime:
         formatted_date_time = transaction.date.strftime("%a, %b %d at %I:%M %p")
+    else:
+        formatted_date_time = transaction.date.strftime("%a, %b %d")
 
     # Get category and category group
     category_group = transaction.category_group_name
