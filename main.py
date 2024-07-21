@@ -81,7 +81,7 @@ def setup_handlers(config):
         query = update.callback_query
         await query.answer(text=f"Unknown command {query.data}", show_alert=True)
 
-    setup_manual_tx_handler(app)
+    setup_manual_tx_handler(app, config)
 
     app.add_handler(CommandHandler("start", handle_start))
     app.add_handler(CommandHandler("register", handle_register_token))
@@ -217,6 +217,9 @@ def load_config():
 
     return {
         "TELEGRAM_BOT_TOKEN": os.getenv("TELEGRAM_BOT_TOKEN"),
+        "PROMPT_FOR_NOTES": os.getenv("PROMPT_FOR_NOTES", "true").lower() == "true",
+        "PROMPT_FOR_CATEGORIES": os.getenv("PROMPT_FOR_CATEGORIES", "true").lower()
+        == "true",
     }
 
 
@@ -231,3 +234,4 @@ if __name__ == "__main__":
 
 # TODO
 # - Add custom icons for famous merchants
+# - Add some settings to disable part of the add manual transaction flow

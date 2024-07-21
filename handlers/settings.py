@@ -129,7 +129,7 @@ def get_current_settings_text(chat_id: int) -> Optional[str]:
         > _We allow disabling time because more often than it is not reliable\._
 
         *Tagging*: {"☑️" if settings.tagging else "☐"}
-        > When enabled, renders categories as Telegram tags.
+        > When enabled, renders categories as Telegram tags\s.
         > Useful for filtering transactions\.
 
         *API token*: ||{settings.token}||

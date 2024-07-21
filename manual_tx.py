@@ -469,19 +469,30 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-def setup_manual_tx_handler(app: Application):
+def setup_manual_tx_handler(app: Application, config: dict):
+    steps = [
+        (prompt_for_account, capture_account),
+        (prompt_for_amount, capture_amount),
+        (prompt_for_date, capture_date),
+        (prompt_for_payee, capture_payee),
+    ]
+
+    if config["PROMPT_FOR_CATEGORIES"]:
+        steps.extend(
+            [
+                (prompt_for_category_group, capture_category_group),
+                (prompt_for_subcategory, capture_subcategory),
+            ]
+        )
+
+    if config["PROMPT_FOR_NOTES"]:
+        steps.append((prompt_for_notes, capture_notes))
+
+    steps.append((confirm_transaction, save_transaction))
+
     transaction_handler = build_conversation_handler(
         start_step=start_transaction,
-        steps=[
-            (prompt_for_account, capture_account),
-            (prompt_for_amount, capture_amount),
-            (prompt_for_date, capture_date),
-            (prompt_for_category_group, capture_category_group),
-            (prompt_for_subcategory, capture_subcategory),
-            (prompt_for_payee, capture_payee),
-            (prompt_for_notes, capture_notes),
-            (confirm_transaction, save_transaction),
-        ],
+        steps=steps,
         cancel_handler=CallbackQueryHandler(cancel, pattern=CANCEL),
     )
 

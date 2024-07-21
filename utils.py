@@ -116,6 +116,9 @@ def build_conversation_handler(
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_id = await start_step(update, context)
         context.user_data[CONVERSATION_MSG_ID] = message_id
+
+        # delete the command message
+        await update.message.delete()
         return 0
 
     async def initial_capture(update: Update, _: ContextTypes.DEFAULT_TYPE) -> bool:
