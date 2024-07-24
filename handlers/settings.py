@@ -111,44 +111,44 @@ def get_current_settings_text(chat_id: int) -> Optional[str]:
         f"""
         🛠️ 🆂🅴🆃🆃🅸🅽🅶🆂
         
-        *Poll interval*: {poll_interval}
+        1️⃣ *Poll interval*: {poll_interval}
         > This is how often we check for new transactions\.
         {next_poll_at}
         > Trigger now: /review\\_transactions
 
-        *Auto\-mark transactions as reviewed*: {"☑️" if settings.auto_mark_reviewed else "☐"}
+        2️⃣ *Auto\-mark transactions as reviewed*: {"☑️" if settings.auto_mark_reviewed else "☐"}
         > When enabled, transactions will be marked as reviewed automatically after being sent to Telegram\.
         > When disabled, you need to explicitly mark them as reviewed\.
 
-        *Poll pending transactions*: {"☑️" if settings.poll_pending else "☐"}
+        3️⃣ *Poll pending transactions*: {"☑️" if settings.poll_pending else "☐"}
         > When enabled, the bot will also poll for pending transactions and send updates when they are cleared\.
 
-        *Show full date/time*: {"☑️" if settings.show_datetime else "☐"}
+        4️⃣ *Show full date/time*: {"☑️" if settings.show_datetime else "☐"}
         > When enabled, shows the full date and time for each transaction\.
         > When disabled, shows only the date without the time\.
         > _We allow disabling time because more often than it is not reliable\._
 
-        *Tagging*: {"☑️" if settings.tagging else "☐"}
-        > When enabled, renders categories as Telegram tags\s.
+        5️⃣ *Tagging*: {"☑️" if settings.tagging else "☐"}
+        > When enabled, renders categories as Telegram tags\.
         > Useful for filtering transactions\.
 
-        *API token*: ||{settings.token}||
+        6️⃣ *API token*: ||{settings.token}||
         """
     )
 
 
 def get_settings_buttons(settings: Settings) -> InlineKeyboardMarkup:
     kbd = Keyboard()
-    kbd += ("Change poll interval", "changePollInterval")
+    kbd += ("1️⃣ Change interval", "changePollInterval")
     kbd += (
-        "Toggle auto-mark reviewed",
+        "2️⃣ Auto-mark reviewed?",
         f"toggleAutoMarkReviewed_{settings.auto_mark_reviewed}",
     )
-    kbd += ("Toggle poll pending", f"togglePollPending_{settings.poll_pending}")
-    kbd += ("Toggle show date/time", f"toggleShowDateTime_{settings.show_datetime}")
-    kbd += ("Toggle tagging", f"toggleTagging_{settings.tagging}")
+    kbd += ("3️⃣ Poll pending?", f"togglePollPending_{settings.poll_pending}")
+    kbd += ("4️⃣ Show date/time?", f"toggleShowDateTime_{settings.show_datetime}")
+    kbd += ("5️⃣ Tagging?", f"toggleTagging_{settings.tagging}")
+    kbd += ("6️⃣ Change token", "registerToken")
     kbd += ("Trigger Plaid refresh", "triggerPlaidRefresh")
-    kbd += ("Change token", "registerToken")
     kbd += ("Log out", "logout")
     kbd += ("Done", "doneSettings")
     return kbd.build()
