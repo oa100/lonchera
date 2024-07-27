@@ -24,7 +24,7 @@ from utils import Keyboard, find_related_tx
 logger = logging.getLogger("tx_handler")
 
 
-async def check_transactions_and_telegram_them(
+async def check_posted_transactions_and_telegram_them(
     context: ContextTypes.DEFAULT_TYPE, chat_id: int
 ) -> List[TransactionObject]:
     # get date from 15 days ago
@@ -52,42 +52,7 @@ async def check_transactions_and_telegram_them(
             )
             transaction.status = "cleared"
 
-        if get_db().was_already_sent(
-            transaction.id
-        ) or get_db().was_already_sent_by_plaid_id(
-            transaction.plaid_metadata["transaction_id"]
-        ):
-            tx = get_db().get_tx_by_plaid_id(
-                transaction.plaid_metadata["transaction_id"]
-            ) or get_db().get_tx_by_id(transaction.id)
-            if tx.pending and not transaction.is_pending:
-                # Transaction was previously sent as pending and is now cleared
-                msg_id = tx.message_id
-                logger.info(
-                    f"Transaction {transaction.id} was previously sent as pending, "
-                    "but is now cleared. Updating message..."
-                )
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"Transaction {transaction.id} is now cleared.",
-                    reply_to_message_id=msg_id,
-                )
-                await send_transaction_message(
-                    context,
-                    transaction,
-                    chat_id,
-                    msg_id,
-                    posted_at=datetime.now(),
-                )
-                get_db().mark_as_sent(
-                    transaction.id,
-                    chat_id,
-                    msg_id,
-                    transaction.recurring_type,
-                    pending=False,
-                    reviewed=settings.auto_mark_reviewed,
-                    plaid_id=transaction.plaid_metadata.get("transaction_id", None),
-                )
+        if get_db().was_already_sent(transaction.id):
             continue
 
         # check if the current transaction is related to a previously sent one
@@ -136,11 +101,8 @@ async def check_pending_transactions_and_telegram_them(
 
     logger.info(f"Found {len(transactions)} pending transactions")
 
-    settings = get_db().get_current_settings(chat_id)
     for transaction in transactions:
-        if settings.poll_pending and get_db().was_already_sent(
-            transaction.id, pending=True
-        ):
+        if get_db().was_already_sent(transaction.id, pending=True):
             logger.info(f"Skipping already sent pending transaction {transaction.id}")
             continue
         msg_id = await send_transaction_message(context, transaction, chat_id)
@@ -159,18 +121,18 @@ async def check_pending_transactions_and_telegram_them(
 async def handle_check_transactions(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
-    transactions = await check_transactions_and_telegram_them(
-        context, chat_id=update.message.chat_id
-    )
-
     settings = get_db().get_current_settings(update.effective_chat.id)
     if not settings:
         logger.error(f"No settings found for chat {update.effective_chat.id}!")
         return
 
     if settings.poll_pending:
-        await check_pending_transactions_and_telegram_them(
+        transactions = await check_pending_transactions_and_telegram_them(
             context, chat_id=update.effective_chat.id
+        )
+    else:
+        transactions = await check_posted_transactions_and_telegram_them(
+            context, chat_id=update.message.chat_id
         )
 
     get_db().update_last_poll_at(update.effective_chat.id, datetime.now().isoformat())
@@ -459,9 +421,12 @@ async def poll_transactions_on_schedule(context: ContextTypes.DEFAULT_TYPE):
             should_poll = datetime.now() >= next_poll_at
 
         if should_poll:
-            await check_transactions_and_telegram_them(context, chat_id=chat_id)
             if settings.poll_pending:
                 await check_pending_transactions_and_telegram_them(
+                    context, chat_id=chat_id
+                )
+            else:
+                await check_posted_transactions_and_telegram_them(
                     context, chat_id=chat_id
                 )
             get_db().update_last_poll_at(chat_id, datetime.now().isoformat())
