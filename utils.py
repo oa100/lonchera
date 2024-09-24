@@ -24,7 +24,7 @@ def make_tag(t: str, title=False, tagging=True):
             return t
 
     tag = "".join([char for char in t if char not in emoji.EMOJI_DATA])
-    tag = tag.title().replace(" ", "").replace(".", "").strip()
+    tag = tag.title().replace(" ", "").replace(".", "").replace("_", "\\_").strip()
 
     emojis = "".join([char for char in t if char in emoji.EMOJI_DATA])
     if title:
@@ -175,3 +175,7 @@ def build_conversation_handler(
         states=states,
         fallbacks=[cancel_handler],
     )
+
+
+def clean_md(text: str) -> str:
+    return text.replace("_", " ").replace("*", " ").replace("`", " ")

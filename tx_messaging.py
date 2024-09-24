@@ -10,7 +10,7 @@ from lunchable.models import TransactionObject
 
 from lunch import get_lunch_client_for_chat_id
 from persistence import get_db
-from utils import Keyboard, make_tag
+from utils import Keyboard, clean_md, make_tag
 
 
 logger = logging.getLogger("messaging")
@@ -132,7 +132,7 @@ async def send_transaction_message(
         reviewed_watermark = "\u200C"
 
     message = f"{category_group} {reviewed_watermark} {recurring}\n\n"
-    message += f"*{transaction.payee}*\n\n"
+    message += f"*{clean_md(transaction.payee)}*\n\n"
     message += f"*Amount*: `{explicit_sign}{abs(transaction.amount):,.2f}``{transaction.currency.upper()}`\n"
     message += f"*Date/Time*: {formatted_date_time}\n"
 
@@ -148,7 +148,7 @@ async def send_transaction_message(
     if transaction.notes:
         message += f"*Notes*: {transaction.notes}\n"
     if transaction.tags:
-        tags = [f"#{tag.name}" for tag in transaction.tags]
+        tags = [f"{make_tag(tag.name)}" for tag in transaction.tags]
         message += f"*Tags*: {', '.join(tags)}\n"
 
     logger.info(f"Sending message to chat_id {chat_id}: {message}")
