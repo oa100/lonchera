@@ -196,7 +196,7 @@ async def handle_btn_show_categories(update: Update, _: ContextTypes.DEFAULT_TYP
 
     kbd += ("Cancel", f"cancelCategorization_{transaction_id}")
 
-    await query.edit_message_reply_markup(reply_markup=kbd.build(columns=3))
+    await query.edit_message_reply_markup(reply_markup=kbd.build(columns=2))
     await query.answer()
 
 
@@ -208,28 +208,17 @@ async def handle_btn_show_subcategories(update: Update, _: ContextTypes.DEFAULT_
     chat_id = query.message.chat.id
     lunch = get_lunch_client_for_chat_id(chat_id)
     subcategories = lunch.get_categories()
-    subcategory_buttons = []
+    kbd = Keyboard()
     for subcategory in subcategories:
         if str(subcategory.group_id) == str(category_id):
-            subcategory_buttons.append(
-                InlineKeyboardButton(
-                    subcategory.name,
-                    callback_data=f"applyCategory_{transaction_id}_{subcategory.id}",
-                )
+            kbd += (
+                subcategory.name,
+                f"applyCategory_{transaction_id}_{subcategory.id}",
             )
-    subcategory_buttons = [
-        subcategory_buttons[i : i + 3] for i in range(0, len(subcategory_buttons), 3)
-    ]
-    subcategory_buttons.append(
-        [
-            InlineKeyboardButton(
-                "Cancel", callback_data=f"cancelCategorization_{transaction_id}"
-            )
-        ]
-    )
+    kbd += ("Cancel", f"cancelCategorization_{transaction_id}")
 
     await query.edit_message_reply_markup(
-        reply_markup=InlineKeyboardMarkup(subcategory_buttons)
+        reply_markup=kbd.build(columns=2)
     )
     await query.answer()
 
@@ -241,10 +230,13 @@ async def handle_btn_apply_category(update: Update, context: ContextTypes.DEFAUL
 
     transaction_id, category_id = query.data.split("_")[1:]
     lunch = get_lunch_client_for_chat_id(chat_id)
+    
+    # TODO: hide status="cleared" behind a setting
     lunch.update_transaction(
-        transaction_id, TransactionUpdateObject(category_id=category_id)
+        transaction_id, TransactionUpdateObject(category_id=category_id, status="cleared")
     )
-    logger.info(f"Changing category for tx {transaction_id} to {category_id}")
+    logger.info(f"Changed category for tx {transaction_id} to {category_id}")
+    
     updated_transaction = lunch.get_transaction(transaction_id)
     await send_transaction_message(
         context, updated_transaction, chat_id, query.message.message_id

@@ -196,7 +196,7 @@ async def handle_btn_set_token_from_button(
 
 
 async def handle_btn_toggle_auto_mark_reviewed(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
+    update: Update, _: ContextTypes.DEFAULT_TYPE
 ):
     settings = get_db().get_current_settings(update.effective_chat.id)
     get_db().update_auto_mark_reviewed(
