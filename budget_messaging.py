@@ -67,7 +67,7 @@ def get_budget_category_buttons(
 
     # add exit button
     kbd += ("Exit", f"exitBudgetDetails_{budget_date}")
-    return kbd.build(columns=3)
+    return kbd.build(columns=2)
 
 
 def build_budget_message(
@@ -84,8 +84,9 @@ def build_budget_message(
             _, budget_data = next(iter(budget_item.data.items()))
             spent_already = budget_data.spending_to_base
             budgeted = budget_data.budget_to_base
-            if budgeted is None:
-                return f"No budget data available for the month of {budget_date.strftime('%B %Y')}"
+            if budgeted is None or budgeted == 0:
+                print(f"No budget data for: {budget_item}")
+                continue
             total_budget += budgeted
             total_spent += spent_already
             pct = spent_already * 100 / budgeted
