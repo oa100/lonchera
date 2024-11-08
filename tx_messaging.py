@@ -50,21 +50,21 @@ def get_tx_buttons(
 
     if not collapsed:
         kbd += ("Rename payee", f"renamePayee_{transaction_id}")
-        kbd += ("Edit notes", f"editNotes_{transaction_id}")
+        kbd += ("Set notes", f"editNotes_{transaction_id}")
         kbd += ("Set tags", f"setTags_{transaction_id}")
-        kbd += ("Dump plaid details", f"plaid_{transaction_id}")
+        kbd += ("Plaid details", f"plaid_{transaction_id}")
 
         skip = not is_pending
         if skip and not is_reviewed:
             kbd += ("Skip", f"skip_{transaction_id}")
 
         if is_reviewed:
-            kbd += ("Mark as unreviewed", f"unreview_{transaction_id}")
+            kbd += ("Unreview", f"unreview_{transaction_id}")
 
     if not is_reviewed and not is_pending:
-        kbd += ("Mark as reviewed", f"review_{transaction_id}")
+        kbd += ("Reviewed ✓", f"review_{transaction_id}")
 
-    if not is_pending and not collapsed and is_reviewed:
+    if not is_pending and not collapsed:
         kbd += ("⬒ Collapse", f"collapse_{transaction_id}")
 
     return kbd.build()
@@ -129,9 +129,9 @@ async def send_transaction_message(
     if is_reviewed:
         reviewed_watermark = "\u200B"
     else:
-        reviewed_watermark = "\u200C"
+        reviewed_watermark = ""
 
-    message = f"{category_group} {reviewed_watermark} {recurring}\n\n"
+    message = f"{category_group}\n\n"
     message += f"*{clean_md(transaction.payee)}*\n\n"
     message += f"*Amount*: `{explicit_sign}{abs(transaction.amount):,.2f}``{transaction.currency.upper()}`\n"
     message += f"*Date/Time*: {formatted_date_time}\n"
@@ -159,6 +159,9 @@ async def send_transaction_message(
                 chat_id=chat_id,
                 message_id=message_id,
                 text=message,
+                # text='🛻 #Transportation\n\nLadwp\n\nAmount: 285.09USD\nDate/Time: 2024-11-05\nCategory:#TaxisAndRideShares \nAccount:  #BofaChecking',
+                # # text='🛻 #Transportation\n\nLadwp\n\nAmount: 285.09USD\nDate/Time: 2024-11-05\nCategory:💡#TaxisAndRideShares \nAccount:  #BofaChecking',
+                # # text='💡 #RentAndUtilities\n\nLadwp\n\nAmount: 285.09USD\nDate/Time: 2024-11-05\nCategory: 💡 #GasAndElectricity \nAccount:  #BofaChecking',
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=get_tx_buttons(transaction),
             )
