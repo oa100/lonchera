@@ -110,7 +110,7 @@ async def send_transaction_message(
     # Get category and category group
     category_group = transaction.category_group_name
     if category_group is None:
-        category_group = "*No Category Group*"
+        category_group = ""
     else:
         category_group = make_tag(category_group, title=True, tagging=tagging)
 
@@ -129,9 +129,9 @@ async def send_transaction_message(
     if is_reviewed:
         reviewed_watermark = "\u200B"
     else:
-        reviewed_watermark = ""
+        reviewed_watermark = "\u200C"
 
-    message = f"{category_group}\n\n"
+    message = f"{category_group} {reviewed_watermark} {recurring}\n\n"
     message += f"*{clean_md(transaction.payee)}*\n\n"
     message += f"*Amount*: `{explicit_sign}{abs(transaction.amount):,.2f}``{transaction.currency.upper()}`\n"
     message += f"*Date/Time*: {formatted_date_time}\n"
@@ -159,9 +159,6 @@ async def send_transaction_message(
                 chat_id=chat_id,
                 message_id=message_id,
                 text=message,
-                # text='🛻 #Transportation\n\nLadwp\n\nAmount: 285.09USD\nDate/Time: 2024-11-05\nCategory:#TaxisAndRideShares \nAccount:  #BofaChecking',
-                # # text='🛻 #Transportation\n\nLadwp\n\nAmount: 285.09USD\nDate/Time: 2024-11-05\nCategory:💡#TaxisAndRideShares \nAccount:  #BofaChecking',
-                # # text='💡 #RentAndUtilities\n\nLadwp\n\nAmount: 285.09USD\nDate/Time: 2024-11-05\nCategory: 💡 #GasAndElectricity \nAccount:  #BofaChecking',
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=get_tx_buttons(transaction),
             )
