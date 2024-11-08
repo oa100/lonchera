@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Load environment variables from .env file if it exists
+if [ -f .env ]; then
+  export $(grep -v '^#' .env | xargs)
+fi
+
 # Generate version based on current date and time
 VERSION=$(date +"%Y%m%d_%H%M")
 
@@ -24,8 +29,11 @@ docker rm "${IMAGE_NAME}" 2>/dev/null || true
 
 echo "Running Docker container as daemon"
 
+# Use the data directory from the environment variable or default to PWD
+DATA_DIR="${DATA_DIR:-$PWD}"
+
 # Run the Docker container as a daemon
-docker run -d -v /mnt/disco/k3s/lonchera/data/:/data -e DB_PATH=/data/lonchera.db --name "${IMAGE_NAME}" "${FULL_IMAGE_NAME}"
+docker run -d -v "${DATA_DIR}:/data" -e DB_PATH=/data/lonchera.db --name "${IMAGE_NAME}" "${FULL_IMAGE_NAME}"
 
 echo "Docker container is now running as a daemon"
 

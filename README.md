@@ -28,9 +28,14 @@ This is very useful when tracking cash or other kinds of accounts.
 ![video2](media/2.gif)
 
 # 📊 Budget Tracking
+
 - Displays the current state of the user's budget for the current month
 
 ![video3](media/3.gif)
+
+# Show balances
+
+- It can also show you the balances of all your accounts at a point in time
 
 # ⚙️ Customizable Settings
 - Change the polling interval for new transactions
@@ -43,8 +48,9 @@ This is very useful when tracking cash or other kinds of accounts.
 1. Clone the repository
 2. Set up your Telegram bot token and Lunch Money API token
 3. Build and run the Docker container using the provided scripts
+  * Make sure to provide a local .env file with TELEGRAM_BOT_TOKEN=xxxx with the API of your own telegram bot
 
-Note:
+## Note:
 
 There is an instance of the bot, which is what I am currently using myself, that works:
 
