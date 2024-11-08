@@ -2,15 +2,13 @@
 
 Lonchera is a Telegram bot that seamlessly integrates with the [Lunch Money](https://lunchmoney.app/) personal finance application, empowering users to effortlessly manage their financial transactions right from Telegram.
 
-## 🌟 Key Features
-
-### 🔍 Transaction Monitoring
+# 🔍 Transaction Monitoring
 - Periodically checks for new transactions and sends notifications to the user
 - Allows users to manually request a list of recent transactions
 
 ![img1](media/main.png)
 
-### 🏷️ Transaction Management
+# 🏷️ Transaction Management
 For each transaction, users can:
 - Change the category
 - Add tags
@@ -21,7 +19,7 @@ For each transaction, users can:
 
 ![video1](media/1.gif)
 
-### 💸 Manual Transactions
+# 💸 Manual Transactions
 
 - Enables users to manually add transactions for accounts not managed by Plaid
 
@@ -29,19 +27,19 @@ This is very useful when tracking cash or other kinds of accounts.
 
 ![video2](media/2.gif)
 
-### 📊 Budget Tracking
+# 📊 Budget Tracking
 - Displays the current state of the user's budget for the current month
 
 ![video3](media/3.gif)
 
-### ⚙️ Customizable Settings
+# ⚙️ Customizable Settings
 - Change the polling interval for new transactions
 - Toggle auto-marking of transactions as reviewed
 - Manage the Lunch Money API token
 
 ![video4](media/4.gif)
 
-## 🚀 Getting Started
+# 🚀 Getting Started
 1. Clone the repository
 2. Set up your Telegram bot token and Lunch Money API token
 3. Build and run the Docker container using the provided scripts
@@ -61,7 +59,7 @@ same bot can track transactions for my accounts and for my wife's in her own Tel
 
 Feel free to ask me questions about how to run it yourself. That's why the source code is provided.
 
-## 📄 License
+# 📄 License
 This project is licensed under the [MIT License](LICENSE.md).
 
 ---
