@@ -193,7 +193,10 @@ async def handle_btn_show_categories(update: Update, _: ContextTypes.DEFAULT_TYP
     kbd = Keyboard()
     for category in categories:
         if category.group_id is None:
-            kbd += (category.name, f"subcategorize_{transaction_id}_{category.id}")
+            if category.children:
+                kbd += (category.name, f"subcategorize_{transaction_id}_{category.id}")
+            else:
+                kbd += (category.name, f"applyCategory_{transaction_id}_{category.id}")
 
     kbd += ("Cancel", f"cancelCategorization_{transaction_id}")
 
