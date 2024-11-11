@@ -3,10 +3,11 @@ import logging
 from textwrap import dedent
 from typing import List
 from lunchable import TransactionUpdateObject
-from telegram import ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import ForceReply, Update
 from telegram.ext import ContextTypes
 from telegram.constants import ReactionEmoji, ParseMode
 
+from deepinfra import auto_categorize
 from handlers.expectations import (
     EDIT_NOTES,
     RENAME_PAYEE,
@@ -217,9 +218,7 @@ async def handle_btn_show_subcategories(update: Update, _: ContextTypes.DEFAULT_
             )
     kbd += ("Cancel", f"cancelCategorization_{transaction_id}")
 
-    await query.edit_message_reply_markup(
-        reply_markup=kbd.build(columns=2)
-    )
+    await query.edit_message_reply_markup(reply_markup=kbd.build(columns=2))
     await query.answer()
 
 
@@ -230,13 +229,14 @@ async def handle_btn_apply_category(update: Update, context: ContextTypes.DEFAUL
 
     transaction_id, category_id = query.data.split("_")[1:]
     lunch = get_lunch_client_for_chat_id(chat_id)
-    
+
     # TODO: hide status="cleared" behind a setting
     lunch.update_transaction(
-        transaction_id, TransactionUpdateObject(category_id=category_id, status="cleared")
+        transaction_id,
+        TransactionUpdateObject(category_id=category_id, status="cleared"),
     )
     logger.info(f"Changed category for tx {transaction_id} to {category_id}")
-    
+
     updated_transaction = lunch.get_transaction(transaction_id)
     await send_transaction_message(
         context, updated_transaction, chat_id, query.message.message_id
@@ -380,6 +380,28 @@ async def handle_set_tx_notes_or_tags(
         chat_id=update.message.chat_id,
         message_id=update.message.message_id,
         reaction=ReactionEmoji.WRITING_HAND,
+    )
+
+
+async def handle_btn_autocategorize(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    tx_id = int(query.data.split("_")[1])
+
+    chat_id = query.message.chat.id
+    response = auto_categorize(tx_id, chat_id)
+    await update.callback_query.answer(
+        text=response,
+        show_alert=True,
+    )
+
+    # update the transaction message to show the new notes
+    lunch = get_lunch_client_for_chat_id(chat_id)
+    updated_tx = lunch.get_transaction(tx_id)
+    await send_transaction_message(
+        context,
+        transaction=updated_tx,
+        chat_id=chat_id,
+        message_id=update.callback_query.message.message_id,
     )
 
 

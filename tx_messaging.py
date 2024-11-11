@@ -47,6 +47,7 @@ def get_tx_buttons(
     categorize = recurring_type is None
     if categorize and not collapsed:
         kbd += ("Categorize", f"categorize_{transaction_id}")
+        kbd += ("Auto-categorize 🪄", f"autocategorize_{transaction_id}")
 
     if not collapsed:
         kbd += ("Rename payee", f"renamePayee_{transaction_id}")

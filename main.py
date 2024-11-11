@@ -29,6 +29,7 @@ from handlers.general import (
 from handlers.transactions import (
     check_pending_transactions,
     handle_btn_apply_category,
+    handle_btn_autocategorize,
     handle_btn_cancel_categorization,
     handle_btn_collapse_transaction,
     handle_btn_dump_plaid_details,
@@ -144,6 +145,9 @@ def setup_handlers(config):
     )
     app.add_handler(
         CallbackQueryHandler(handle_btn_show_categories, pattern=r"^categorize_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(handle_btn_autocategorize, pattern=r"^autocategorize_")
     )
     app.add_handler(
         CallbackQueryHandler(handle_btn_show_subcategories, pattern=r"^subcategorize_")

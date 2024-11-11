@@ -33,6 +33,10 @@ def make_tag(t: str, title=False, tagging=True):
         return f"{emojis} #{tag}"
 
 
+def remove_emojis(text: str) -> str:
+    return "".join([char for char in text if not is_emoji(char)]).strip()
+
+
 def find_related_tx(
     tx: TransactionObject, txs: List[TransactionObject]
 ) -> Optional[TransactionObject]:
