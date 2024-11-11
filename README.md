@@ -37,6 +37,8 @@ This is very useful when tracking cash or other kinds of accounts.
 
 - It can also show you the balances of all your accounts at a point in time
 
+![balances](media/balances.png)
+
 # ⚙️ Customizable Settings
 - Change the polling interval for new transactions
 - Toggle auto-marking of transactions as reviewed
