@@ -165,7 +165,7 @@ async def send_transaction_message(
             )
         except Exception as e:
             if "Message is not modified" in str(e):
-                logger.info(f"Message {message_id} is not modified, skipping edit")
+                logger.debug(f"Message is not modified, skipping edit ({message_id})")
             else:
                 raise e
         return message_id

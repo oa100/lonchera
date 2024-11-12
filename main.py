@@ -26,6 +26,7 @@ from handlers.general import (
     handle_generic_message,
     handle_start,
 )
+from handlers.syncing import handle_resync
 from handlers.transactions import (
     check_pending_transactions,
     handle_btn_apply_category,
@@ -91,6 +92,7 @@ def setup_handlers(config):
     app.add_handler(CommandHandler("show_budget", handle_show_budget))
     app.add_handler(CommandHandler("clear_cache", clear_cache))
     app.add_handler(CommandHandler("settings", handle_settings))
+    app.add_handler(CommandHandler("resync", handle_resync))
     app.add_handler(
         CallbackQueryHandler(handle_btn_skip_transaction, pattern=r"^skip_")
     )

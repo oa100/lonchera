@@ -119,17 +119,6 @@ class Persistence:
                 is not None
             )
 
-    def was_already_sent_by_plaid_id(self, plaid_id: Optional[str]) -> bool:
-        if plaid_id is None:
-            return False
-        with self.Session() as session:
-            return (
-                session.query(Transaction.message_id)
-                .filter_by(plaid_id=plaid_id)
-                .first()
-                is not None
-            )
-
     def mark_as_sent(
         self,
         tx_id: int,
@@ -167,11 +156,9 @@ class Persistence:
         with self.Session() as session:
             return session.query(Transaction).filter_by(tx_id=tx_id).first()
 
-    def get_tx_by_plaid_id(self, plaid_id: Optional[str]) -> Optional[Transaction]:
-        if plaid_id is None:
-            return None
+    def get_all_tx_by_chat_id(self, chat_id: int) -> List[Transaction]:
         with self.Session() as session:
-            return session.query(Transaction).filter_by(plaid_id=plaid_id).first()
+            return session.query(Transaction).filter_by(chat_id=chat_id).all()
 
     def get_message_id_associated_with(self, tx_id: int, chat_id: int) -> Optional[int]:
         with self.Session() as session:
