@@ -28,10 +28,10 @@ logger = logging.getLogger("tx_handler")
 async def check_posted_transactions_and_telegram_them(
     context: ContextTypes.DEFAULT_TYPE, chat_id: int
 ) -> List[TransactionObject]:
-    # get date from 15 days ago
+    # get date from 30 days ago
     two_weeks_ago = datetime.now().replace(
         hour=0, minute=0, second=0, microsecond=0
-    ) - timedelta(days=15)
+    ) - timedelta(days=30)
     now = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     logger.info(f"Polling for new transactions from {two_weeks_ago} to {now}...")
 
@@ -54,6 +54,9 @@ async def check_posted_transactions_and_telegram_them(
             transaction.status = "cleared"
 
         if get_db().was_already_sent(transaction.id):
+            # TODO: for debugging purposes, sometimes it would be useful
+            # to at least send a message with a reply to the message already sent
+            # and potentially udpate its state
             continue
 
         # check if the current transaction is related to a previously sent one

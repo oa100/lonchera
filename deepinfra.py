@@ -63,7 +63,10 @@ def build_prompt(
         f"""
 This is the transaction information:
 {get_transaction_input_variable(transaction)}
+
 What of the following categories would you suggest for this transaction?
+
+If the Payee is Amazon, then choose the Amazon category ONLY if the notes of the transaction can't be categorized as a specific non-Amazon category.
 
 Respond with the ID of the category, and only the ID.
 
@@ -72,6 +75,8 @@ These are the available categories (using the format `ID:Category Name`):
 {get_categories_input_variable(categories)}
             
 Remember to ONLY RESPOND with the ID, and nothing else.
+
+DO NOT EXPLAIN YOURSELF. JUST RESPOND WITH THE ID or null.
         """
     )
 
@@ -134,10 +139,12 @@ def auto_categorize(tx_id: int, chat_id: int) -> str:
             # no need to recategorize
             return "Already categorized correctly"
 
+        print("AI response: ", category_id)
         for cat in categories:
             if cat.id == int(category_id):
+                # TODO: hide status="cleared" behind a setting
                 lunch.update_transaction(
-                    tx_id, TransactionUpdateObject(category_id=cat.id)
+                    tx_id, TransactionUpdateObject(category_id=cat.id, status="cleared")
                 )
                 return f"Transaction recategorized to {cat.name}"
 

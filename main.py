@@ -239,3 +239,7 @@ if __name__ == "__main__":
 # TODO
 # - Add custom icons for famous merchants
 # - Add some settings to disable part of the add manual transaction flow
+# - Add command to resync transactions. i.e., if a change was made to the transaction in Lunch Money,
+#   it should be reflected in the bot after this is run. It should just go through all the messages
+#   sent and for each one get the transaction from Lunch Money and update the message.
+#
