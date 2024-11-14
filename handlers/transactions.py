@@ -371,8 +371,11 @@ async def handle_set_tx_notes_or_tags(
             tx_id, TransactionUpdateObject(tags=tags_without_hashtag)
         )
     else:
-        logger.info(f"Setting notes to transaction ({tx_id}): {msg_text}")
-        lunch.update_transaction(tx_id, TransactionUpdateObject(notes=msg_text))
+        notes = msg_text
+        if len(notes) > 350:
+            notes = notes[:350]
+        logger.info(f"Setting notes to transaction ({tx_id}): {notes}")
+        lunch.update_transaction(tx_id, TransactionUpdateObject(notes=notes))
 
     # update the transaction message to show the new notes
     updated_tx = lunch.get_transaction(tx_id)

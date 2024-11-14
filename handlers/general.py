@@ -125,9 +125,10 @@ async def handle_generic_message(
         # updates the transaction with the new notes
         lunch = get_lunch_client_for_chat_id(update.effective_chat.id)
         transaction_id = int(expectation["transaction_id"])
-        lunch.update_transaction(
-            transaction_id, TransactionUpdateObject(notes=update.message.text)
-        )
+        notes = update.message.text
+        if len(notes) > 350:
+            notes = notes[:350]
+        lunch.update_transaction(transaction_id, TransactionUpdateObject(notes=notes))
 
         # edit the message to reflect the new notes
         updated_transaction = lunch.get_transaction(transaction_id)
