@@ -6,6 +6,7 @@ from collections import defaultdict
 import logging
 import argparse
 import sys
+import json
 
 from dotenv import load_dotenv
 from lunchable import TransactionUpdateObject
@@ -13,7 +14,7 @@ from lunchable import TransactionUpdateObject
 from lunch import get_lunch_client
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("amz")
 
 
 def parse_date_time(d: str) -> datetime:
@@ -99,7 +100,7 @@ def parse_csv_and_filter(
     return closest_result
 
 
-def run(file_path: str, days_back: int):
+def run(file_path: str, days_back: int, dry_run: bool) -> str:
     load_dotenv()
     token = os.getenv("LUNCH_MONEY_TOKEN")
     if not token:
@@ -125,6 +126,12 @@ def run(file_path: str, days_back: int):
     amz_cnt = len(amz)
     found_cnt = 0
     will_update = 0
+    report = {
+        "processed_transactions": amz_cnt,
+        "will_update_transactions": will_update,
+        "found_transactions": found_cnt,
+        "updates": [],
+    }
     for a in amz:
         found = parse_csv_and_filter(
             file_path, a.date.strftime("%Y-%m-%d"), a.amount, a.currency
@@ -144,13 +151,24 @@ def run(file_path: str, days_back: int):
                 a.notes,
                 found,
             )
-            product_name = found["Product Name"]
-            if len(product_name) > 350:
-                product_name = product_name[:350]
-            logger.info(
-                lunch.update_transaction(
-                    a.id, TransactionUpdateObject(notes=product_name)
+            if not dry_run:
+                product_name = found["Product Name"]
+                if len(product_name) > 350:
+                    product_name = product_name[:350]
+                logger.info(
+                    lunch.update_transaction(
+                        a.id, TransactionUpdateObject(notes=product_name)
+                    )
                 )
+            report["updates"].append(
+                {
+                    "transaction_id": a.id,
+                    "date": a.date.strftime("%Y-%m-%d"),
+                    "amount": a.amount,
+                    "currency": a.currency,
+                    "notes": found["Product Name"],
+                    "account_name": a.account_display_name,
+                }
             )
             will_update += 1
         else:
@@ -164,13 +182,23 @@ def run(file_path: str, days_back: int):
 
     logger.info("Processed %d Amazon transactions", amz_cnt)
     logger.info("Will update %d Amazon transactions out of %d", will_update, found_cnt)
+    return json.dumps(report, indent=4)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process Amazon transactions.")
     parser.add_argument("file_path", type=str, help="Path to the orders CSV file")
     parser.add_argument(
-        "days_back", type=int, help="Number of days back to pull transactions"
+        "--days-back",
+        type=int,
+        default=365,
+        help="Number of days back to pull transactions (default: 365)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show transactions to be updated without actually updating",
     )
     args = parser.parse_args()
-    run(args.file_path, args.days_back)
+    result = run(args.file_path, args.days_back, args.dry_run)
+    print(result)
