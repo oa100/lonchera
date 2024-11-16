@@ -12,11 +12,11 @@ logger = logging.getLogger("messaging")
 
 async def handle_resync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /resync command."""
-    # support resyncing only the last n transactions
+    # support resyncing only the last n days
     parts = update.message.text.split(" ")
-    last_n_txs = None
+    last_n_days = None
     if len(parts) > 1:
-        last_n_txs = int(parts[1])
+        last_n_days = int(parts[1])
 
     chat_id = update.effective_chat.id
     lunch = get_lunch_client_for_chat_id(chat_id)
@@ -31,6 +31,9 @@ async def handle_resync(update: Update, context: ContextTypes.DEFAULT_TYPE):
         hour=0, minute=0, second=0, microsecond=0
     )
 
+    if last_n_days:
+        earliest_tx_date = latest_tx_date - timedelta(days=last_n_days)
+
     # get the txs within the bounds
     logger.info(
         f"Pulling transactions from lunch for range {earliest_tx_date} - {latest_tx_date}"
@@ -44,8 +47,8 @@ async def handle_resync(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # now we use the information in this the tx from lunch to update the tx in the db
     # and if we miss any, we will query them individually later on
-    if last_n_txs:
-        chat_txs = chat_txs[-last_n_txs:]
+    if last_n_days:
+        chat_txs = [tx for tx in chat_txs if tx.created_at >= earliest_tx_date]
 
     errors = 0
     missing = 0

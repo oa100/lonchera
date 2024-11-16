@@ -134,7 +134,7 @@ async def send_transaction_message(
 
     message = f"{category_group} {reviewed_watermark} {recurring}\n\n"
     message += f"*{clean_md(transaction.payee)}*\n\n"
-    message += f"*Amount*: `{explicit_sign}{abs(transaction.amount):,.2f}``{transaction.currency.upper()}`\n"
+    message += f"*Amount*: `{explicit_sign}{abs(transaction.amount):,.2f}` `{transaction.currency.upper()}`\n"
     message += f"*Date/Time*: {formatted_date_time}\n"
 
     category_name = transaction.category_name or "Uncategorized"

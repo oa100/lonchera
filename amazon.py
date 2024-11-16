@@ -25,14 +25,18 @@ def parse_date_time(d: str) -> datetime:
 
 
 def parse_csv_and_filter(
-    file_path: str, target_date: str, target_price: float, target_currency: str
+    file_path: str,
+    target_date: str,
+    target_price: float,
+    target_currency: str,
+    allow_days: int,
 ) -> Dict[str, str]:
     # Convert target_date string to a datetime object
     target_date = datetime.strptime(target_date, "%Y-%m-%d")
 
     # Define the date range for filtering
-    start_date = target_date - timedelta(days=5)
-    end_date = target_date + timedelta(days=5)
+    start_date = target_date - timedelta(days=allow_days)
+    end_date = target_date + timedelta(days=allow_days)
 
     closest_result = None
     closest_date_diff = timedelta.max
@@ -100,7 +104,7 @@ def parse_csv_and_filter(
     return closest_result
 
 
-def run(file_path: str, days_back: int, dry_run: bool) -> str:
+def run(file_path: str, days_back: int, dry_run: bool, allow_days: int) -> str:
     load_dotenv()
     token = os.getenv("LUNCH_MONEY_TOKEN")
     if not token:
@@ -134,7 +138,7 @@ def run(file_path: str, days_back: int, dry_run: bool) -> str:
     }
     for a in amz:
         found = parse_csv_and_filter(
-            file_path, a.date.strftime("%Y-%m-%d"), a.amount, a.currency
+            file_path, a.date.strftime("%Y-%m-%d"), a.amount, a.currency, allow_days
         )
         if not found:
             a.plaid_metadata = None
@@ -195,10 +199,16 @@ if __name__ == "__main__":
         help="Number of days back to pull transactions (default: 365)",
     )
     parser.add_argument(
+        "--allow-days",
+        type=int,
+        default=5,
+        help="Number of days threshold for matching against the CSV (default: 5)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show transactions to be updated without actually updating",
     )
     args = parser.parse_args()
-    result = run(args.file_path, args.days_back, args.dry_run)
+    result = run(args.file_path, args.days_back, args.dry_run, args.allow_days)
     print(result)

@@ -32,7 +32,6 @@ from utils import CONVERSATION_MSG_ID, Keyboard, build_conversation_handler, mak
 # Define callback data
 CONTINUE = "continue"
 TODAY, YESTERDAY = "today", "yesterday"
-USD, COP = "USD", "COP"
 CREDIT, DEBIT, CASH = "credit", "debit", "cash"
 SKIP = "skip"
 SPENT_MONEY = "spent"
