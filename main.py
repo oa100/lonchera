@@ -252,4 +252,7 @@ if __name__ == "__main__":
 # - Add command to resync transactions. i.e., if a change was made to the transaction in Lunch Money,
 #   it should be reflected in the bot after this is run. It should just go through all the messages
 #   sent and for each one get the transaction from Lunch Money and update the message.
-#
+# - Have the bot pin a message containing important info:
+#  - Current networth
+#  - current debt
+#  - next recurring charges

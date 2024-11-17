@@ -112,32 +112,32 @@ def get_current_settings_text(chat_id: int) -> Optional[str]:
         🛠️ 🆂🅴🆃🆃🅸🅽🅶🆂
         
         1️⃣ *Poll interval*: {poll_interval}
-        > This is how often we check for new transactions\.
+        > This is how often we check for new transactions\\.
         {next_poll_at}
         > Trigger now: /review\\_transactions
 
         2️⃣ *Polling mode*: {"`pending`" if settings.poll_pending else "`posted`"}
-        > When `posted` is enabled, the bot will poll for transactions that are already posted\.
-        > This is the default mode and, because of the way Lunch Money/Plaid work, will allow categorizing the transactions and mark them as reviewed from Telegram\.
+        > When `posted` is enabled, the bot will poll for transactions that are already posted\\.
+        > This is the default mode and, because of the way Lunch Money/Plaid work, will allow categorizing the transactions and mark them as reviewed from Telegram\\.
         > 
-        > When `pending` the bot will only poll for pending transactions\.
-        > This sends you more timely notifications, but you would need to either manually review them or enable auto\-mark transactions as reviewed\.
+        > When `pending` the bot will only poll for pending transactions\\.
+        > This sends you more timely notifications, but you would need to either manually review them or enable auto\\-mark transactions as reviewed\\.
 
-        3️⃣ *Auto\-mark transactions as reviewed*: {"☑️" if settings.auto_mark_reviewed else "☐"}
-        > When enabled, transactions will be marked as reviewed automatically after being sent to Telegram\.
-        > When disabled, you need to explicitly mark them as reviewed\.
+        3️⃣ *Auto\\-mark transactions as reviewed*: {"☑️" if settings.auto_mark_reviewed else "☐"}
+        > When enabled, transactions will be marked as reviewed automatically after being sent to Telegram\\.
+        > When disabled, you need to explicitly mark them as reviewed\\.
 
         4️⃣ *Mark reviewed after categorization*: {"☑️" if settings.mark_reviewed_after_categorized else "☐"}
-        > When enabled, transactions will be marked as reviewed automatically after being categorized\.
+        > When enabled, transactions will be marked as reviewed automatically after being categorized\\.
 
         5️⃣ *Show full date/time*: {"☑️" if settings.show_datetime else "☐"}
-        > When enabled, shows the full date and time for each transaction\.
-        > When disabled, shows only the date without the time\.
-        > _We allow disabling time because more often than it is not reliable\._
+        > When enabled, shows the full date and time for each transaction\\.
+        > When disabled, shows only the date without the time\\.
+        > _We allow disabling time because more often than it is not reliable\\._
 
         6️⃣ *Tagging*: {"☑️" if settings.tagging else "☐"}
-        > When enabled, renders categories as Telegram tags\.
-        > Useful for filtering transactions\.
+        > When enabled, renders categories as Telegram tags\\.
+        > Useful for filtering transactions\\.
 
         7️⃣ *API token*: ||{settings.token}||
         """
