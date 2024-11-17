@@ -236,11 +236,18 @@ async def handle_btn_apply_category(update: Update, context: ContextTypes.DEFAUL
     transaction_id, category_id = query.data.split("_")[1:]
     lunch = get_lunch_client_for_chat_id(chat_id)
 
-    # TODO: hide status="cleared" behind a setting
-    lunch.update_transaction(
-        transaction_id,
-        TransactionUpdateObject(category_id=category_id, status="cleared"),
-    )
+    settings = get_db().get_current_settings(chat_id)
+    if settings.mark_reviewed_after_categorized:
+        lunch.update_transaction(
+            transaction_id,
+            TransactionUpdateObject(category_id=category_id, status="cleared"),
+        )
+        get_db().mark_as_reviewed(query.message.message_id, chat_id)
+    else:
+        lunch.update_transaction(
+            transaction_id,
+            TransactionUpdateObject(category_id=category_id),
+        )
     logger.info(f"Changed category for tx {transaction_id} to {category_id}")
 
     updated_transaction = lunch.get_transaction(transaction_id)

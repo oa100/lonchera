@@ -127,16 +127,19 @@ def get_current_settings_text(chat_id: int) -> Optional[str]:
         > When enabled, transactions will be marked as reviewed automatically after being sent to Telegram\.
         > When disabled, you need to explicitly mark them as reviewed\.
 
-        4️⃣ *Show full date/time*: {"☑️" if settings.show_datetime else "☐"}
+        4️⃣ *Mark reviewed after categorization*: {"☑️" if settings.mark_reviewed_after_categorized else "☐"}
+        > When enabled, transactions will be marked as reviewed automatically after being categorized\.
+
+        5️⃣ *Show full date/time*: {"☑️" if settings.show_datetime else "☐"}
         > When enabled, shows the full date and time for each transaction\.
         > When disabled, shows only the date without the time\.
         > _We allow disabling time because more often than it is not reliable\._
 
-        5️⃣ *Tagging*: {"☑️" if settings.tagging else "☐"}
+        6️⃣ *Tagging*: {"☑️" if settings.tagging else "☐"}
         > When enabled, renders categories as Telegram tags\.
         > Useful for filtering transactions\.
 
-        6️⃣ *API token*: ||{settings.token}||
+        7️⃣ *API token*: ||{settings.token}||
         """
     )
 
@@ -149,9 +152,13 @@ def get_settings_buttons(settings: Settings) -> InlineKeyboardMarkup:
         "3️⃣ Auto-mark reviewed?",
         f"toggleAutoMarkReviewed_{settings.auto_mark_reviewed}",
     )
-    kbd += ("4️⃣ Show date/time?", f"toggleShowDateTime_{settings.show_datetime}")
-    kbd += ("5️⃣ Tagging?", f"toggleTagging_{settings.tagging}")
-    kbd += ("6️⃣ Change token", "registerToken")
+    kbd += (
+        "4️⃣ Mark reviewed after categorization?",
+        "toggleMarkReviewedAfterCategorized",
+    )
+    kbd += ("5️⃣ Show date/time?", f"toggleShowDateTime_{settings.show_datetime}")
+    kbd += ("6️⃣ Tagging?", f"toggleTagging_{settings.tagging}")
+    kbd += ("7️⃣ Change token", "registerToken")
     kbd += ("Trigger Plaid refresh", "triggerPlaidRefresh")
     kbd += ("Log out", "logout")
     kbd += ("Done", "doneSettings")
@@ -327,6 +334,22 @@ async def handle_btn_toggle_tagging(update: Update, _: ContextTypes.DEFAULT_TYPE
     settings = get_db().get_current_settings(update.effective_chat.id)
 
     get_db().update_tagging(update.effective_chat.id, not settings.tagging)
+
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(
+        text=get_current_settings_text(update.effective_chat.id),
+        reply_markup=get_settings_buttons(settings),
+        parse_mode=ParseMode.MARKDOWN_V2,
+    )
+
+
+async def handle_btn_toggle_mark_reviewed_after_categorized(
+    update: Update, _: ContextTypes.DEFAULT_TYPE
+):
+    settings = get_db().get_current_settings(update.effective_chat.id)
+    get_db().update_mark_reviewed_after_categorized(
+        update.effective_chat.id, not settings.mark_reviewed_after_categorized
+    )
 
     await update.callback_query.answer()
     await update.callback_query.edit_message_text(

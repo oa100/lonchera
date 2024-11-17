@@ -1,6 +1,4 @@
 import os
-import random
-from dotenv import load_dotenv
 from lunchable import TransactionUpdateObject
 import requests
 
@@ -10,7 +8,8 @@ from lunchable.models import (
     CategoriesObject,
 )
 
-from lunch import get_lunch_client, get_lunch_client_for_chat_id
+from lunch import get_lunch_client_for_chat_id
+from persistence import get_db
 from utils import remove_emojis
 
 
@@ -81,27 +80,6 @@ DO NOT EXPLAIN YOURSELF. JUST RESPOND WITH THE ID or null.
     )
 
 
-def test_recategorization():
-    load_dotenv()
-    lunch = get_lunch_client(os.getenv("LUNCH_MONEY_TOKEN"))
-    # take 3 random transactions and save them in an array:
-    txs = lunch.get_transactions()
-    random_txs = random.sample(txs, 3)
-    categories = lunch.get_categories()
-
-    for tx in random_txs:
-        print("-----------")
-        print(tx)
-        print()
-        prompt = build_prompt(tx, categories)
-        category_id = send_message_to_llm(prompt)
-        print("suggested category: ", category_id)
-        category = [
-            category for category in categories if category.id == int(category_id)
-        ][0]
-        print("category: ", category)
-
-
 def send_message_to_llm(content):
     url = "https://api.deepinfra.com/v1/openai/chat/completions"
     headers = {
@@ -122,9 +100,6 @@ def send_message_to_llm(content):
         response.raise_for_status()
 
 
-# test_recategorization()
-
-
 def auto_categorize(tx_id: int, chat_id: int) -> str:
     lunch = get_lunch_client_for_chat_id(chat_id)
     tx = lunch.get_transaction(tx_id)
@@ -142,10 +117,16 @@ def auto_categorize(tx_id: int, chat_id: int) -> str:
         print("AI response: ", category_id)
         for cat in categories:
             if cat.id == int(category_id):
-                # TODO: hide status="cleared" behind a setting
-                lunch.update_transaction(
-                    tx_id, TransactionUpdateObject(category_id=cat.id, status="cleared")
-                )
+                settings = get_db().get_current_settings(chat_id)
+                if settings.mark_reviewed_after_categorized:
+                    lunch.update_transaction(
+                        tx_id,
+                        TransactionUpdateObject(category_id=cat.id, status="cleared"),
+                    )
+                else:
+                    lunch.update_transaction(
+                        tx_id, TransactionUpdateObject(category_id=cat.id)
+                    )
                 return f"Transaction recategorized to {cat.name}"
 
         return "AI failed to categorize the transaction"

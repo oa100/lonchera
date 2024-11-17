@@ -83,6 +83,9 @@ class Settings(Base):
     # Whether to create tags using the make_tag function
     tagging = Column(Boolean, default=True, nullable=False)
 
+    # Indicates whether transactions should be marked as reviewed after categorization
+    mark_reviewed_after_categorized = Column(Boolean, default=False, nullable=False)
+
 
 class Persistence:
     def __init__(self, db_path: str):
@@ -269,6 +272,16 @@ class Persistence:
                 update(Settings)
                 .where(Settings.chat_id == chat_id)
                 .values(tagging=tagging)
+            )
+            session.execute(stmt)
+            session.commit()
+
+    def update_mark_reviewed_after_categorized(self, chat_id: int, value: bool) -> None:
+        with self.Session() as session:
+            stmt = (
+                update(Settings)
+                .where(Settings.chat_id == chat_id)
+                .values(mark_reviewed_after_categorized=value)
             )
             session.execute(stmt)
             session.commit()

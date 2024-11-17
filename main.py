@@ -62,6 +62,7 @@ from handlers.settings import (
     handle_register_token,
     handle_btn_set_token_from_button,
     handle_settings,
+    handle_btn_toggle_mark_reviewed_after_categorized,
 )
 
 logging.basicConfig(
@@ -200,6 +201,13 @@ def setup_handlers(config):
 
     app.add_handler(
         CallbackQueryHandler(handle_btn_toggle_tagging, pattern=r"^toggleTagging")
+    )
+
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_btn_toggle_mark_reviewed_after_categorized,
+            pattern=r"^toggleMarkReviewedAfterCategorized$",
+        )
     )
 
     app.add_handler(CallbackQueryHandler(handle_unknown_btn))
