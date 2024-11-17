@@ -108,13 +108,6 @@ async def send_transaction_message(
     else:
         formatted_date_time = transaction.date.strftime("%a, %b %d")
 
-    # Get category and category group
-    category_group = transaction.category_group_name
-    if category_group is None:
-        category_group = ""
-    else:
-        category_group = make_tag(category_group, title=True, tagging=tagging)
-
     recurring = ""
     if transaction.recurring_type:
         recurring = "(recurring 🔄)"
@@ -132,13 +125,22 @@ async def send_transaction_message(
     else:
         reviewed_watermark = "\u200C"
 
-    message = f"{category_group} {reviewed_watermark} {recurring}\n\n"
-    message += f"*{clean_md(transaction.payee)}*\n\n"
+    message = f"*{clean_md(transaction.payee)}* {reviewed_watermark} {recurring}\n\n"
     message += f"*Amount*: `{explicit_sign}{abs(transaction.amount):,.2f}` `{transaction.currency.upper()}`\n"
     message += f"*Date/Time*: {formatted_date_time}\n"
 
+    # Get category and category group
+    category_group = transaction.category_group_name
+    if category_group is not None:
+        category_group = make_tag(
+            category_group, title=True, tagging=tagging, no_emojis=True
+        )
+        category_group = f"{category_group} / "
+
     category_name = transaction.category_name or "Uncategorized"
-    message += f"*Category*: {make_tag(category_name, tagging=tagging)} \n"
+    message += (
+        f"*Category*: {category_group}{make_tag(category_name, tagging=tagging)} \n"
+    )
 
     acct_name = (
         transaction.plaid_account_display_name

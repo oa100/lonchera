@@ -16,21 +16,28 @@ def is_emoji(char):
     return char in emoji.EMOJI_DATA
 
 
-def make_tag(t: str, title=False, tagging=True):
-    if not tagging:
-        if title:
-            return f"*{t}*"
-        else:
-            return t
+def make_tag(t: str, title=False, tagging=True, no_emojis=False) -> str:
+    result = ""
+    if tagging:
+        result = "".join([char for char in t if char not in emoji.EMOJI_DATA])
+        result = (
+            result.title().replace(" ", "").replace(".", "").replace("_", "\\_").strip()
+        )
 
-    tag = "".join([char for char in t if char not in emoji.EMOJI_DATA])
-    tag = tag.title().replace(" ", "").replace(".", "").replace("_", "\\_").strip()
-
+    # find emojis so we can all put them at the beginning
+    # otherwise tagging will break
     emojis = "".join([char for char in t if char in emoji.EMOJI_DATA])
-    if title:
-        return f"{emojis} *#{tag}*"
+    if no_emojis:
+        emojis = ""
     else:
-        return f"{emojis} #{tag}"
+        emojis += " "
+
+    tag_char = "#" if tagging else ""
+
+    if title:
+        return f"{emojis}*{tag_char}{result}*"
+    else:
+        return f"{emojis}{tag_char}{result}"
 
 
 def remove_emojis(text: str) -> str:
