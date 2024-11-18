@@ -67,10 +67,10 @@ from handlers.settings import (
     handle_settings,
     handle_btn_toggle_mark_reviewed_after_categorized,
 )
-from web_server import run_web_server
+from web_server import run_web_server, update_bot_status
 
 logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s"
+    level=logging.DEBUG, format="%(asctime)s [%(name)s] %(levelname%s: %(message)s"
 )
 logger = logging.getLogger("lonchera")
 
@@ -244,39 +244,49 @@ def load_config():
 async def main():
     config = load_config()
     app = setup_handlers(config)
-    
+
     # Set up signal handlers
     loop = asyncio.get_running_loop()
     stop_signal = asyncio.Event()
-    
+
     for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, stop_signal.set)
+        loop.add_signal_handler(
+            sig, lambda: (update_bot_status(False), stop_signal.set())
+        )
 
     def error_callback(exc: TelegramError):
+        error_msg = str(exc)
         if isinstance(exc, Conflict):
-            logger.info(f"::::: Conflict detected...")
-        else:
-            logger.warning(
-                f":::::  Exception happened while polling for updates: {exc}",
-                exc_info=exc,
+            error_msg = (
+                "Bot instance conflict detected. Look at the logs, but usually this "
+                "means there are other instances of the bot running with the same token, "
+                "which is not allowed."
             )
-    
+        logger.warning(
+            f"Exception happened while polling for updates: {exc}",
+            exc_info=exc,
+        )
+        update_bot_status(True, error_msg)
+
     async with app:
         await app.initialize()
         await app.start()
-        await app.updater.start_polling(allowed_updates=Update.ALL_TYPES, error_callback=error_callback)
-        
+        update_bot_status(True)  # Mark as running when started
+        await app.updater.start_polling(
+            allowed_updates=Update.ALL_TYPES, error_callback=error_callback
+        )
+
         # Start the web server
         runner = await run_web_server()
-        
+
         try:
-            # Keep running until stop signal
             await stop_signal.wait()
         finally:
-            # Cleanup
+            update_bot_status(False)  # Mark as stopped during cleanup
             await runner.cleanup()
             await app.updater.stop()
             await app.stop()
+
 
 if __name__ == "__main__":
     logger.info("Starting Lonchera bot...")
