@@ -1,7 +1,7 @@
 import os
 import time
 import logging
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from aiohttp import web
 
 # Initialize logger
 logger = logging.getLogger("web_server")
@@ -41,54 +41,54 @@ def format_relative_time(seconds):
 
 start_time = time.time()
 
-class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == "/":
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-            db_size = get_db_size()
-            uptime_seconds = time.time() - start_time
-            uptime = format_relative_time(uptime_seconds)
-            
-            version = os.getenv("VERSION")
-            version_info = f"<p>version: {version}</p>" if version else ""
-            
-            commit = os.getenv("COMMIT")
-            commit_link = f'<a href="https://git.sr.ht/~knur/lonchera/commit/{commit}">{commit}</a>' if commit else ""
-            commit_info = f"<p>commit: {commit_link}</p>" if commit else ""
-            
-            bot_status = "running" if application_running() else "stopped"
-            response = f"""
-            <html>
-            <head>
-            <title>lonchera</title>
-            <link rel="stylesheet" href="https://unpkg.com/sakura.css/css/sakura.css" media="screen" />
-            <link rel="stylesheet" href="https://unpkg.com/sakura.css/css/sakura-dark.css" media="screen and (prefers-color-scheme: dark)" />
-            <style>
-                body {{
-                    font-family: monospace;
-                }}
-            </style>
-            </head>
-            <body>
-                <h1>#status</h1>
-                <p>db size: {db_size}</p>
-                <p>uptime: {uptime}</p>
-                {version_info}
-                {commit_info}
-                <p>bot status: {bot_status}</p>
-            </body>
-            </html>
-            """
-            self.wfile.write(response.encode("utf-8"))
+async def handle_root(request):
+    db_size = get_db_size()
+    uptime_seconds = time.time() - start_time
+    uptime = format_relative_time(uptime_seconds)
+    
+    version = os.getenv("VERSION")
+    version_info = f"<p>version: {version}</p>" if version else ""
+    
+    commit = os.getenv("COMMIT")
+    commit_link = f'<a href="https://git.sr.ht/~knur/lonchera/commit/{commit}">{commit}</a>' if commit else ""
+    commit_info = f"<p>commit: {commit_link}</p>" if commit else ""
+    
+    bot_status = "running" if application_running() else "stopped"
+    response = f"""
+    <html>
+    <head>
+    <title>lonchera</title>
+    <link rel="stylesheet" href="https://unpkg.com/sakura.css/css/sakura.css" media="screen" />
+    <link rel="stylesheet" href="https://unpkg.com/sakura.css/css/sakura-dark.css" media="screen and (prefers-color-scheme: dark)" />
+    <style>
+        body {{
+            font-family: monospace;
+        }}
+    </style>
+    </head>
+    <body>
+        <h1>#status</h1>
+        <p>db size: {db_size}</p>
+        <p>uptime: {uptime}</p>
+        {version_info}
+        {commit_info}
+        <p>bot status: {bot_status}</p>
+    </body>
+    </html>
+    """
+    return web.Response(text=response, content_type='text/html')
 
 def application_running():
-    # Placeholder function to determine if the application is running
     return True
 
-def run_web_server():
-    server_address = ("", 8080)
-    httpd = HTTPServer(server_address, SimpleHTTPRequestHandler)
+async def run_web_server():
+    app = web.Application()
+    app.router.add_get('/', handle_root)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '', 8080)
+    
     logger.info("Starting web server on port 8080")
-    httpd.serve_forever()
+    await site.start()
+    return runner
