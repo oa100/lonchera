@@ -65,6 +65,13 @@ def format_relative_time(seconds):
 start_time = time.time()
 
 
+def get_masked_token():
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if len(token) > 8:
+        return f"{token[:4]}...{token[-4:]}"
+    return "not set"
+
+
 async def handle_root(request):
     db_size = get_db_size()
     uptime_seconds = time.time() - start_time
@@ -87,7 +94,9 @@ async def handle_root(request):
         if time_since_error < timedelta(minutes=1):
             status_details = f"<p>Last error ({time_since_error.seconds}s ago): {bot_status.last_error}</p>"
 
-    bot_status_text = "running" if application_running() else "stopped"
+    bot_status_text = "running" if application_running() else "crashing"
+    bot_token = get_masked_token()
+
     response = f"""
     <html>
     <head>
@@ -109,6 +118,7 @@ async def handle_root(request):
         <p>uptime: {uptime}</p>
         {version_info}
         {commit_info}
+        <p>bot token: {bot_token}</p>
         <p>bot status: {bot_status_text}</p>
         {status_details}
     </body>
