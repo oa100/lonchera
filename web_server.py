@@ -1,11 +1,32 @@
 import os
 import time
 import logging
+from typing import Optional
 from aiohttp import web
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 # Initialize logger
 logger = logging.getLogger("web_server")
 logging.basicConfig(level=logging.INFO)
+
+
+@dataclass
+class BotStatus:
+    last_error: str = ""
+    last_error_time: Optional[datetime] = None
+    is_running: bool = False
+
+
+bot_status = BotStatus()
+
+
+def update_bot_status(is_running: bool, error: str = ""):
+    bot_status.is_running = is_running
+    if error:
+        bot_status.last_error = error
+        bot_status.last_error_time = datetime.now()
+
 
 def get_db_size():
     db_path = os.getenv("DB_PATH", "lonchera.db")
@@ -15,13 +36,14 @@ def get_db_size():
         return f"{size_mb:.2f} MB"
     return "DB not found"
 
+
 def format_relative_time(seconds):
     intervals = (
-        ('weeks', 604800),  # 60 * 60 * 24 * 7
-        ('days', 86400),    # 60 * 60 * 24
-        ('hours', 3600),    # 60 * 60
-        ('minutes', 60),
-        ('seconds', 1),
+        ("weeks", 604800),  # 60 * 60 * 24 * 7
+        ("days", 86400),  # 60 * 60 * 24
+        ("hours", 3600),  # 60 * 60
+        ("minutes", 60),
+        ("seconds", 1),
     )
 
     result = []
@@ -31,35 +53,50 @@ def format_relative_time(seconds):
         if value:
             seconds -= value * count
             if value == 1:
-                name = name.rstrip('s')
+                name = name.rstrip("s")
             result.append(f"{int(value)} {name}")
 
     if not result:
         result.append("just started")
 
-    return ', '.join(result) + ' ago'
+    return ", ".join(result) + " ago"
+
 
 start_time = time.time()
+
 
 async def handle_root(request):
     db_size = get_db_size()
     uptime_seconds = time.time() - start_time
     uptime = format_relative_time(uptime_seconds)
-    
+
     version = os.getenv("VERSION")
     version_info = f"<p>version: {version}</p>" if version else ""
-    
+
     commit = os.getenv("COMMIT")
-    commit_link = f'<a href="https://git.sr.ht/~knur/lonchera/commit/{commit}">{commit}</a>' if commit else ""
+    commit_link = (
+        f'<a href="https://git.sr.ht/~knur/lonchera/commit/{commit}">{commit}</a>'
+        if commit
+        else ""
+    )
     commit_info = f"<p>commit: {commit_link}</p>" if commit else ""
-    
-    bot_status = "running" if application_running() else "stopped"
+
+    status_details = ""
+    if bot_status.last_error and bot_status.last_error_time:
+        time_since_error = datetime.now() - bot_status.last_error_time
+        if time_since_error < timedelta(minutes=1):
+            status_details = f"<p>Last error ({time_since_error.seconds}s ago): {bot_status.last_error}</p>"
+
+    bot_status_text = "running" if application_running() else "stopped"
     response = f"""
     <html>
     <head>
     <title>lonchera</title>
     <link rel="stylesheet" href="https://unpkg.com/sakura.css/css/sakura.css" media="screen" />
-    <link rel="stylesheet" href="https://unpkg.com/sakura.css/css/sakura-dark.css" media="screen and (prefers-color-scheme: dark)" />
+    <link rel="stylesheet"
+          href="https://unpkg.com/sakura.css/css/sakura-dark.css"
+          media="screen and (prefers-color-scheme: dark)"
+    />
     <style>
         body {{
             font-family: monospace;
@@ -72,23 +109,34 @@ async def handle_root(request):
         <p>uptime: {uptime}</p>
         {version_info}
         {commit_info}
-        <p>bot status: {bot_status}</p>
+        <p>bot status: {bot_status_text}</p>
+        {status_details}
     </body>
     </html>
     """
-    return web.Response(text=response, content_type='text/html')
+    return web.Response(text=response, content_type="text/html")
+
 
 def application_running():
+    if not bot_status.is_running:
+        return False
+
+    if bot_status.last_error_time:
+        # Check if error happened in the last minute
+        if datetime.now() - bot_status.last_error_time < timedelta(minutes=1):
+            return False
+
     return True
+
 
 async def run_web_server():
     app = web.Application()
-    app.router.add_get('/', handle_root)
-    
+    app.router.add_get("/", handle_root)
+
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '', 8080)
-    
+    site = web.TCPSite(runner, "", 8080)
+
     logger.info("Starting web server on port 8080")
     await site.start()
     return runner
