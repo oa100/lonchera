@@ -1,6 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Default app name
+APP_NAME=""
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --app)
+            APP_NAME="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
 # Read the version from the VERSION file
 VERSION=$(cat VERSION)
 
@@ -25,4 +41,8 @@ else
 fi
 
 # Run the deploy command with the constructed version
-fly deploy --env VERSION="$FULL_VERSION" --env COMMIT="$COMMIT"
+if [[ -n "$APP_NAME" ]]; then
+    fly deploy --app "$APP_NAME" --env VERSION="$FULL_VERSION" --env COMMIT="$COMMIT"
+else
+    fly deploy --env VERSION="$FULL_VERSION" --env COMMIT="$COMMIT"
+fi
