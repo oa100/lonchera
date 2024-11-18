@@ -2,6 +2,7 @@ from datetime import datetime
 import logging
 from typing import Optional, Union
 import pytz
+import os
 
 from telegram import CallbackQuery, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -47,7 +48,8 @@ def get_tx_buttons(
     categorize = recurring_type is None
     if categorize and not collapsed:
         kbd += ("Categorize", f"categorize_{transaction_id}")
-        kbd += ("Auto-categorize 🪄", f"autocategorize_{transaction_id}")
+        if os.getenv("DEEPINFRA_API_KEY"):
+            kbd += ("Auto-categorize 🪄", f"autocategorize_{transaction_id}")
 
     if not collapsed:
         kbd += ("Rename payee", f"renamePayee_{transaction_id}")
