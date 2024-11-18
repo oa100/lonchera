@@ -19,6 +19,22 @@ class BotStatus:
 
 
 bot_status = BotStatus()
+bot_instance = None  # Add this line to store bot instance
+
+
+def set_bot_instance(bot):
+    global bot_instance
+    bot_instance = bot
+
+
+async def get_bot_info():
+    if bot_instance:
+        try:
+            bot_data = await bot_instance.get_me()
+            return f'<a href="https://t.me/{bot_data.username}">@{bot_data.username}</a> ({bot_data.first_name})'
+        except Exception as e:
+            return f"Error getting bot info: {str(e)}"
+    return "Bot instance not available"
 
 
 def update_bot_status(is_running: bool, error: str = ""):
@@ -83,6 +99,7 @@ async def handle_root(request):
     db_size = get_db_size()
     uptime_seconds = time.time() - start_time
     uptime = format_relative_time(uptime_seconds)
+    bot_info = await get_bot_info()
 
     version = os.getenv("VERSION")
     version_info = f"<p>version: {version}</p>" if version else ""
@@ -122,6 +139,7 @@ async def handle_root(request):
     </head>
     <body>
         <h1>#status</h1>
+        <p>bot: {bot_info}</p>
         <p>db size: {db_size}</p>
         <p>uptime: {uptime}</p>
         {version_info}
