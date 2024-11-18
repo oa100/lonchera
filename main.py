@@ -1,5 +1,6 @@
 import logging
 import os
+import threading
 
 from dotenv import load_dotenv
 from telegram import Update
@@ -64,6 +65,7 @@ from handlers.settings import (
     handle_settings,
     handle_btn_toggle_mark_reviewed_after_categorized,
 )
+from web_server import run_web_server
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s"
@@ -240,10 +242,17 @@ def load_config():
 def main():
     config = load_config()
     application = setup_handlers(config)
+
+    # Run the web server in a separate thread
+    web_server_thread = threading.Thread(target=run_web_server)
+    web_server_thread.start()
+
+    # Run the Telegram bot polling
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
+    logger.info("Starting Lonchera bot...")
     main()
 
 # TODO
