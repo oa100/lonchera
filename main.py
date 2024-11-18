@@ -1,9 +1,11 @@
 import logging
 import os
-import threading
+import asyncio
+import signal
 
 from dotenv import load_dotenv
 from telegram import Update
+from telegram.error import TelegramError, Conflict
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -239,21 +241,46 @@ def load_config():
     }
 
 
-def main():
+async def main():
     config = load_config()
-    application = setup_handlers(config)
+    app = setup_handlers(config)
+    
+    # Set up signal handlers
+    loop = asyncio.get_running_loop()
+    stop_signal = asyncio.Event()
+    
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, stop_signal.set)
 
-    # Run the web server in a separate thread
-    web_server_thread = threading.Thread(target=run_web_server)
-    web_server_thread.start()
-
-    # Run the Telegram bot polling
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
-
+    def error_callback(exc: TelegramError):
+        if isinstance(exc, Conflict):
+            logger.info(f"::::: Conflict detected...")
+        else:
+            logger.warning(
+                f":::::  Exception happened while polling for updates: {exc}",
+                exc_info=exc,
+            )
+    
+    async with app:
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling(allowed_updates=Update.ALL_TYPES, error_callback=error_callback)
+        
+        # Start the web server
+        runner = await run_web_server()
+        
+        try:
+            # Keep running until stop signal
+            await stop_signal.wait()
+        finally:
+            # Cleanup
+            await runner.cleanup()
+            await app.updater.stop()
+            await app.stop()
 
 if __name__ == "__main__":
     logger.info("Starting Lonchera bot...")
-    main()
+    asyncio.run(main())
 
 # TODO
 # - Add custom icons for famous merchants
