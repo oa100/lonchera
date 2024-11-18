@@ -67,7 +67,7 @@ from handlers.settings import (
     handle_settings,
     handle_btn_toggle_mark_reviewed_after_categorized,
 )
-from web_server import run_web_server, update_bot_status
+from web_server import run_web_server, update_bot_status, set_bot_instance
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s [%(name)s] %(levelname%s: %(message)s"
@@ -244,6 +244,9 @@ def load_config():
 async def main():
     config = load_config()
     app = setup_handlers(config)
+
+    # Set bot instance in web server
+    set_bot_instance(app.bot)
 
     # Set up signal handlers
     loop = asyncio.get_running_loop()
