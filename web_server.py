@@ -72,6 +72,13 @@ def get_masked_token():
     return "not set"
 
 
+def get_ai_status():
+    api_key = os.getenv("DEEPINFRA_API_KEY", "")
+    if not api_key:
+        return "AI features disabled (no API key provided)"
+    return f"AI enabled (key: {api_key[:4]}...{api_key[-4:]})"
+
+
 async def handle_root(request):
     db_size = get_db_size()
     uptime_seconds = time.time() - start_time
@@ -96,6 +103,7 @@ async def handle_root(request):
 
     bot_status_text = "running" if application_running() else "crashing"
     bot_token = get_masked_token()
+    ai_status = get_ai_status()
 
     response = f"""
     <html>
@@ -119,6 +127,7 @@ async def handle_root(request):
         {version_info}
         {commit_info}
         <p>bot token: {bot_token}</p>
+        <p>ai status: {ai_status}</p>
         <p>bot status: {bot_status_text}</p>
         {status_details}
     </body>
