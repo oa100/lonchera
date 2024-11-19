@@ -243,6 +243,21 @@ def load_config():
 
 async def main():
     config = load_config()
+
+    if not config["TELEGRAM_BOT_TOKEN"]:
+        logger.warning("No TELEGRAM_BOT_TOKEN provided. Only running web server.")
+        runner = await run_web_server()
+
+        stop_signal = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, stop_signal.set)
+        try:
+            await stop_signal.wait()
+        finally:
+            await runner.cleanup()
+        return
+
     app = setup_handlers(config)
 
     # Set bot instance in web server

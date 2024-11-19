@@ -34,7 +34,7 @@ async def get_bot_info():
             return f'<a href="https://t.me/{bot_data.username}">@{bot_data.username}</a> ({bot_data.first_name})'
         except Exception as e:
             return f"Error getting bot info: {str(e)}"
-    return "Bot instance not available"
+    return "Bot instance not available. Did you set the token?"
 
 
 def update_bot_status(is_running: bool, error: str = ""):
