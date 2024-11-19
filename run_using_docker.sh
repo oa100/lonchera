@@ -6,8 +6,10 @@ if [ -f .env ]; then
   export $(grep -v '^#' .env | xargs)
 fi
 
-# Generate version based on current date and time
-VERSION=$(date +"%Y%m%d_%H%M")
+# Generate version by combining VERSION file content with timestamp
+BASE_VERSION=$(cat VERSION)
+TIMESTAMP=$(date +"%Y%m%d_%H%M")
+VERSION="${BASE_VERSION}-${TIMESTAMP}"
 
 # Name of the Docker image
 IMAGE_NAME="lonchera"
@@ -33,7 +35,13 @@ echo "Running Docker container as daemon"
 DATA_DIR="${DATA_DIR:-$PWD}"
 
 # Run the Docker container as a daemon
-docker run -d -v "${DATA_DIR}:/data" -e DB_PATH=/data/lonchera.db --name "${IMAGE_NAME}" "${FULL_IMAGE_NAME}"
+docker run -d \
+    -v "${DATA_DIR}:/data" \
+    -e DB_PATH=/data/lonchera.db \
+    -e TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN}" \
+    -e DEEPINFRA_API_KEY="${DEEPINFRA_API_KEY}" \
+    --name "${IMAGE_NAME}" \
+    "${FULL_IMAGE_NAME}"
 
 echo "Docker container is now running as a daemon"
 

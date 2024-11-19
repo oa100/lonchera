@@ -1,6 +1,8 @@
 # 🥡 Lonchera
 
-Lonchera is a Telegram bot that seamlessly integrates with the [Lunch Money](https://lunchmoney.app/) personal finance application, empowering users to effortlessly manage their financial transactions right from Telegram.
+[Lonchera is a Telegram bot](https://t.me/LunchMoneyAppBot) that seamlessly integrates with the
+[Lunch Money](https://lunchmoney.app/) personal finance application, empowering users to
+effortlessly manage their financial transactions right from Telegram.
 
 # 🔍 Transaction Monitoring
 - Periodically checks for new transactions and sends notifications to the user
@@ -33,6 +35,13 @@ This is very useful when tracking cash or other kinds of accounts.
 
 ![video3](media/3.gif)
 
+# 🤖 AI-Powered Transaction Categorization
+
+- Leverage the [DeepInfra API](https://deepinfra.com/) to automatically categorize transactions using AI
+- This feature helps in accurately categorizing expenses without manual intervention
+
+![ai_categorization](media/ai_categorization.png)
+
 # Show balances
 
 - It can also show you the balances of all your accounts at a point in time
@@ -52,20 +61,23 @@ This is very useful when tracking cash or other kinds of accounts.
 3. Build and run the Docker container using the provided scripts
   * Make sure to provide a local .env file with TELEGRAM_BOT_TOKEN=xxxx with the API of your own telegram bot
 
+# 📚 Self-Hosting Guide
+For detailed instructions on how to run your own instance of the bot, please refer to the [SELFHOST.md](SELFHOST.md) file.
+
 ## Note:
 
-There is an instance of the bot, which is what I am currently using myself, that works:
+There is a publicly available instance of the bot that I am currently using myself:
 
 https://t.me/LunchMoneyAppBot
 
-That said: **DO NOT** plug your personal account to it. I am an honest guy, but this thing is
-literally running on a Raspberry Pi in a closet. I can't guarantee that your data is safe,
-and I would never use this if I had not built it myself.
+However, please consider the following before using it:
+- I run this instance without any uptime or security guarantees.
+- I cannot guarantee the safety of your data.
+- Use this instance at your own risk.
 
-Do plug test accounts if you want to. The bot is designed to support multiple users (e.g.
-same bot can track transactions for my accounts and for my wife's in her own Telegram account).
+If you decide to use it, please be aware that while I promise not to look at or use your token, I cannot provide any assurances beyond my word.
 
-Feel free to ask me questions about how to run it yourself. That's why the source code is provided.
+The bot is designed to support multiple users, meaning the same bot can track transactions for different accounts, such as mine and my wife's, in their respective Telegram accounts.
 
 # 📄 License
 This project is licensed under the [MIT License](LICENSE.md).
