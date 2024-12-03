@@ -10,6 +10,7 @@ from telegram.constants import ParseMode
 from amazon import get_amazon_transactions_summary, process_amazon_transactions
 from handlers.expectations import AMAZON_EXPORT, clear_expectation, set_expectation
 from utils import Keyboard
+from persistence import get_db
 
 
 async def handle_amazon_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -174,6 +175,9 @@ async def handle_amazon_export(update: Update, context: ContextTypes.DEFAULT_TYP
             return
         download_path = csv_file_path
 
+    # Increment the metric for Amazon export uploads
+    get_db().inc_metric("amazon_export_uploads")
+
     # get summary of the csv file
     try:
         context.user_data["amazon_export_file"] = download_path
@@ -227,6 +231,9 @@ async def handle_preview_process_amazon_transactions(
             "Seems like I forgot the Amazon export file. Please start over: /amazon_sync"
         )
         return
+
+    # Increment the metric for Amazon autocategorization runs
+    get_db().inc_metric("amazon_autocategorization_runs")
 
     try:
         await query.edit_message_text(
@@ -326,6 +333,9 @@ async def handle_process_amazon_transactions(
             "Seems like I forgot the Amazon export file. Please start over: /amazon_sync"
         )
         return
+
+    # Increment the metric for Amazon autocategorization runs
+    get_db().inc_metric("amazon_autocategorization_runs")
 
     try:
         msg = await query.edit_message_text(
