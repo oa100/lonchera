@@ -193,6 +193,9 @@ async def handle_amazon_export(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as e:
         await update.message.reply_text(f"Error processing the file: {e}")
         return
+    finally:
+        if os.path.exists(download_path):
+            os.remove(download_path)
 
 
 async def handle_update_amz_settings(
@@ -375,3 +378,6 @@ async def handle_process_amazon_transactions(
         await msg.delete()
     except Exception as e:
         await query.edit_message_text(f"Error processing Amazon transactions: {e}")
+    finally:
+        if os.path.exists(export_file):
+            os.remove(export_file)

@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime, timedelta
 from telegram import Update
@@ -5,8 +6,11 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from persistence import get_db
 
+logger = logging.getLogger(__name__)
+
 
 async def handle_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("Received /stats command")
     admin_user_id = os.getenv("ADMIN_USER_ID")
     if not admin_user_id or update.effective_user.id != int(admin_user_id):
         await update.message.reply_text("You are not authorized to use this command.")
