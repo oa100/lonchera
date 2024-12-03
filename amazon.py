@@ -11,6 +11,7 @@ import json
 from dotenv import load_dotenv
 from lunchable import TransactionUpdateObject
 
+from deepinfra import get_suggested_category_id
 from lunch import get_lunch_client
 
 logging.basicConfig(level=logging.INFO)
@@ -44,6 +45,8 @@ def parse_csv_and_filter(
         lambda: {"total_owed": 0.0, "currency": "", "product_names": [], "rows": []}
     )
 
+    margin_of_error = 0.5
+
     # Read and parse the CSV file
     with open(file_path, mode="r", newline="") as csvfile:
         reader = csv.DictReader(csvfile)
@@ -68,7 +71,7 @@ def parse_csv_and_filter(
     # Check aggregated data against target price and currency
     for order_id, data in order_data.items():
         if (
-            data["total_owed"] == target_price
+            abs(data["total_owed"] - target_price) <= margin_of_error
             and data["currency"].lower() == target_currency.lower()
         ):
             date_diff = abs(
@@ -88,7 +91,7 @@ def parse_csv_and_filter(
                 total_owed = float(row["Total Owed"].replace(",", ""))
                 currency = row["Currency"]
                 if (
-                    total_owed == target_price
+                    abs(total_owed - target_price) <= margin_of_error
                     and currency.lower() == target_currency.lower()
                 ):
                     date_diff = abs(target_date - parse_date_time(row["Order Date"]))
@@ -104,7 +107,13 @@ def parse_csv_and_filter(
     return closest_result
 
 
-def run(file_path: str, days_back: int, dry_run: bool, allow_days: int) -> str:
+def run(
+    file_path: str,
+    days_back: int,
+    dry_run: bool,
+    allow_days: int,
+    auto_categorize: True,
+) -> str:
     load_dotenv()
     token = os.getenv("LUNCH_MONEY_TOKEN")
     if not token:
@@ -112,6 +121,7 @@ def run(file_path: str, days_back: int, dry_run: bool, allow_days: int) -> str:
         sys.exit(1)
 
     lunch = get_lunch_client(token)
+    categories = lunch.get_categories()
     today = datetime.now()
     today = today.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -155,13 +165,29 @@ def run(file_path: str, days_back: int, dry_run: bool, allow_days: int) -> str:
                 a.notes,
                 found,
             )
+
+            category_id = a.category_id
+            product_name = found["Product Name"]
+            if auto_categorize:
+                _, cat_id = get_suggested_category_id(
+                    tx_id=a.id, lunch=lunch, override_notes=product_name
+                )
+                # make sure the category exists, since LLMs hallucinate
+                if cat_id not in [c.id for c in categories]:
+                    category_id = a.category_id  # just leave it as is
+                else:
+                    category_id = cat_id
+
             if not dry_run:
-                product_name = found["Product Name"]
                 if len(product_name) > 350:
                     product_name = product_name[:350]
+
                 logger.info(
                     lunch.update_transaction(
-                        a.id, TransactionUpdateObject(notes=product_name)
+                        a.id,
+                        TransactionUpdateObject(
+                            notes=product_name, category_id=category_id
+                        ),
                     )
                 )
             report["updates"].append(
@@ -172,6 +198,10 @@ def run(file_path: str, days_back: int, dry_run: bool, allow_days: int) -> str:
                     "currency": a.currency,
                     "notes": found["Product Name"],
                     "account_name": a.account_display_name,
+                    "category_id": category_id,
+                    "category_name": [
+                        c.name for c in categories if c.id == category_id
+                    ],
                 }
             )
             will_update += 1
@@ -209,6 +239,18 @@ if __name__ == "__main__":
         action="store_true",
         help="Show transactions to be updated without actually updating",
     )
+    parser.add_argument(
+        "--auto-categorize",
+        action="store_true",
+        help="Automatically categorize transactions using AI",
+        default=False,
+    )
     args = parser.parse_args()
-    result = run(args.file_path, args.days_back, args.dry_run, args.allow_days)
+    result = run(
+        args.file_path,
+        args.days_back,
+        args.dry_run,
+        args.allow_days,
+        args.auto_categorize,
+    )
     print(result)

@@ -1,5 +1,7 @@
+import logging
 import os
-from lunchable import TransactionUpdateObject
+from typing import Optional
+from lunchable import LunchMoney, TransactionUpdateObject
 import requests
 
 from textwrap import dedent
@@ -12,8 +14,12 @@ from lunch import get_lunch_client_for_chat_id
 from persistence import get_db
 from utils import remove_emojis
 
+logger = logging.getLogger(__name__)
 
-def get_transaction_input_variable(transaction: TransactionObject) -> str:
+
+def get_transaction_input_variable(
+    transaction: TransactionObject, override_notes: Optional[str] = None
+) -> str:
     tx_input_variable = dedent(
         f"""
     Payee: {transaction.payee}
@@ -26,10 +32,10 @@ def get_transaction_input_variable(transaction: TransactionObject) -> str:
         name: {transaction.plaid_metadata['name']}"""
         )
 
-    if transaction.notes:
+    if transaction.notes or override_notes:
         tx_input_variable += dedent(
             f"""
-        notes: {transaction.notes}
+        notes: {override_notes or transaction.notes}
         """
         )
 
@@ -55,13 +61,15 @@ def get_categories_input_variable(categories: list[CategoriesObject]) -> str:
 
 
 def build_prompt(
-    transaction: TransactionObject, categories: list[CategoriesObject]
+    transaction: TransactionObject,
+    categories: list[CategoriesObject],
+    override_notes: Optional[str] = None,
 ) -> str:
-    print(get_transaction_input_variable(transaction))
+    logger.info(get_transaction_input_variable(transaction))
     return dedent(
         f"""
 This is the transaction information:
-{get_transaction_input_variable(transaction)}
+{get_transaction_input_variable(transaction, override_notes=override_notes)}
 
 What of the following categories would you suggest for this transaction?
 
@@ -113,19 +121,15 @@ def send_message_to_llm(content):
 
 def auto_categorize(tx_id: int, chat_id: int) -> str:
     lunch = get_lunch_client_for_chat_id(chat_id)
-    tx = lunch.get_transaction(tx_id)
     categories = lunch.get_categories()
 
-    prompt = build_prompt(tx, categories)
-    print(prompt)
-
     try:
-        category_id = send_message_to_llm(prompt)
+        tx, category_id = get_suggested_category_id(tx_id, lunch)
         if int(category_id) == tx.category_id:
             # no need to recategorize
             return "Already categorized correctly"
 
-        print("AI response: ", category_id)
+        logger.info(f"AI response: {category_id}")
         for cat in categories:
             if cat.id == int(category_id):
                 settings = get_db().get_current_settings(chat_id)
@@ -142,5 +146,22 @@ def auto_categorize(tx_id: int, chat_id: int) -> str:
 
         return "AI failed to categorize the transaction"
     except Exception as e:
-        print(e)
+        logger.error(f"Error while categorizing transaction: {e}")
         return "AI crashed while categorizing the transaction"
+
+
+def get_suggested_category_id(
+    tx_id: int, lunch: LunchMoney, override_notes: Optional[str] = None
+) -> tuple[TransactionObject, int]:
+    tx = lunch.get_transaction(tx_id)
+    categories = lunch.get_categories()
+
+    prompt = build_prompt(tx, categories, override_notes=override_notes)
+    logger.info(prompt)
+
+    try:
+        category_id = send_message_to_llm(prompt)
+        return tx, int(category_id)
+    except Exception as e:
+        logger.error(f"Error while categorizing transaction: {e}")
+        return tx, -1
