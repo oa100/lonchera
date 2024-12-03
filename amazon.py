@@ -6,7 +6,6 @@ from collections import defaultdict
 import logging
 import argparse
 import sys
-import json
 
 from dotenv import load_dotenv
 from lunchable import TransactionUpdateObject
@@ -107,13 +106,32 @@ def parse_csv_and_filter(
     return closest_result
 
 
-def run(
+def get_amazon_transactions_summary(file_path: str):
+    """Just return a summary of the transactions in the CSV file."""
+    summary = defaultdict(int)
+    date_ranges = {"start_date": None, "end_date": None}
+    with open(file_path, mode="r", newline="") as csvfile:
+        reader = csv.DictReader(csvfile)
+
+        transactions = list(reader)
+        summary["total_transactions"] = len(transactions)
+
+        if transactions:
+            dates = [parse_date_time(row["Order Date"]) for row in transactions]
+            date_ranges["start_date"] = min(dates).strftime("%Y-%m-%d")
+            date_ranges["end_date"] = max(dates).strftime("%Y-%m-%d")
+
+    summary.update(date_ranges)
+    return summary
+
+
+def process_amazon_transactions(
     file_path: str,
     days_back: int,
     dry_run: bool,
     allow_days: int,
     auto_categorize: True,
-) -> str:
+) -> dict:
     load_dotenv()
     token = os.getenv("LUNCH_MONEY_TOKEN")
     if not token:
@@ -142,8 +160,6 @@ def run(
     will_update = 0
     report = {
         "processed_transactions": amz_cnt,
-        "will_update_transactions": will_update,
-        "found_transactions": found_cnt,
         "updates": [],
     }
     for a in amz:
@@ -167,6 +183,11 @@ def run(
             )
 
             category_id = a.category_id
+            previous_category_name = [c.name for c in categories if c.id == category_id]
+            previous_category_name = (
+                previous_category_name[0] if previous_category_name else None
+            )
+
             product_name = found["Product Name"]
             if auto_categorize:
                 _, cat_id = get_suggested_category_id(
@@ -190,6 +211,8 @@ def run(
                         ),
                     )
                 )
+            category_name = [c.name for c in categories if c.id == category_id]
+            category_name = category_name[0] if category_name else None
             report["updates"].append(
                 {
                     "transaction_id": a.id,
@@ -199,9 +222,8 @@ def run(
                     "notes": found["Product Name"],
                     "account_name": a.account_display_name,
                     "category_id": category_id,
-                    "category_name": [
-                        c.name for c in categories if c.id == category_id
-                    ],
+                    "previous_category_name": previous_category_name,
+                    "new_category_name": category_name,
                 }
             )
             will_update += 1
@@ -216,7 +238,9 @@ def run(
 
     logger.info("Processed %d Amazon transactions", amz_cnt)
     logger.info("Will update %d Amazon transactions out of %d", will_update, found_cnt)
-    return json.dumps(report, indent=4)
+    report["found_transactions"] = found_cnt
+    report["will_update_transactions"] = will_update
+    return report
 
 
 if __name__ == "__main__":
@@ -246,7 +270,7 @@ if __name__ == "__main__":
         default=False,
     )
     args = parser.parse_args()
-    result = run(
+    result = process_amazon_transactions(
         args.file_path,
         args.days_back,
         args.dry_run,

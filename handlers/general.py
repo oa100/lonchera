@@ -6,6 +6,7 @@ from lunchable import TransactionUpdateObject
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
+from handlers.amz import handle_amazon_export
 from handlers.categorization import ai_categorize_transaction
 from handlers.settings.schedule_rendering import (
     get_schedule_rendering_buttons,
@@ -16,6 +17,7 @@ from telegram.constants import ReactionEmoji
 from handlers.settings.session import handle_register_token
 from lunch import get_lunch_client_for_chat_id
 from handlers.expectations import (
+    AMAZON_EXPORT,
     EDIT_NOTES,
     EXPECTING_TIME_ZONE,
     EXPECTING_TOKEN,
@@ -273,3 +275,16 @@ async def handle_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=update.effective_chat.id,
         message_id=query.message.message_id,
     )
+
+
+async def handle_file_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Generic handler for file uploads"""
+    expectation = get_expectation(update.effective_chat.id)
+    if expectation and expectation["expectation"] == AMAZON_EXPORT:
+        await handle_amazon_export(update, context)
+    else:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="I'm not expecting a file right now.",
+        )
+    return True

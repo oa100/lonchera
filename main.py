@@ -16,6 +16,12 @@ from telegram.ext import (
 )
 
 
+from handlers.amz import (
+    handle_amazon_sync,
+    handle_process_amazon_transactions,
+    handle_update_amz_settings,
+    handle_preview_process_amazon_transactions,
+)
 from handlers.balances import (
     handle_btn_accounts_balances,
     handle_show_balances,
@@ -31,6 +37,7 @@ from handlers.budget import (
 from handlers.general import (
     clear_cache,
     handle_errors,
+    handle_file_upload,
     handle_generic_message,
     handle_start,
     handle_cancel,
@@ -116,6 +123,7 @@ def setup_handlers(config):
     app.add_handler(CommandHandler("settings", handle_settings))
     app.add_handler(CommandHandler("stats", handle_stats))
     app.add_handler(CommandHandler("status", handle_status))
+    app.add_handler(CommandHandler("amazon_sync", handle_amazon_sync))
     app.add_handler(
         CallbackQueryHandler(handle_settings_menu, pattern=r"^settingsMenu$")
     )
@@ -273,6 +281,25 @@ def setup_handlers(config):
 
     app.add_handler(CallbackQueryHandler(handle_done_budget, pattern=r"^doneBudget$"))
 
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_update_amz_settings, pattern=r"^update_amz_settings_"
+        )
+    )
+
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_preview_process_amazon_transactions,
+            pattern=r"^preview_process_amazon_transactions$",
+        )
+    )
+
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_process_amazon_transactions, pattern=r"^process_amazon_transactions$"
+        )
+    )
+
     # Add a generic cancel handler for any leftover cancel buttons
     app.add_handler(CallbackQueryHandler(handle_cancel, pattern=r"^cancel$"))
 
@@ -287,6 +314,7 @@ def setup_handlers(config):
         MessageHandler(filters.TEXT & filters.REPLY, handle_set_tx_notes_or_tags)
     )
     app.add_handler(MessageHandler(filters.TEXT, handle_generic_message))
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_file_upload))
     app.add_handler(
         MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data)
     )
