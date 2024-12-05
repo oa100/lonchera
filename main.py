@@ -409,4 +409,3 @@ if __name__ == "__main__":
 #  - Current networth
 #  - current debt
 #  - next recurring charges
-# - Add option to run auto-categorization as transactions are added

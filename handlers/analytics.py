@@ -5,6 +5,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from persistence import get_db
+from utils import Keyboard
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,8 @@ async def handle_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 all_metrics[key][date.strftime("%a %b %d")] = value
 
     for metric_name, values in all_metrics.items():
-        message += f"`{metric_name}`\n"
+        total_sum = sum(float(value) for value in values.values())
+        message += f"`{metric_name}` (Total: {total_sum:.4f})\n"
         for date, value in values.items():
             if int(value) == value:
                 value = int(value)
@@ -56,9 +58,13 @@ async def handle_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not has_data:
         message += "No analytics data available for this week."
 
+    kbd = Keyboard()
+    kbd += ("Cancel", "cancel")
+
     await update.message.reply_text(
         text=message,
         parse_mode=ParseMode.MARKDOWN,
+        reply_markup=kbd.build(),
     )
 
 
@@ -80,4 +86,11 @@ async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Messages sent: {sent_message_count}\n"
     )
 
-    await update.message.reply_text(message)
+    # Add cancel button
+    kbd = Keyboard()
+    kbd += ("Cancel", "cancel")
+
+    await update.message.reply_text(
+        text=message,
+        reply_markup=kbd.build(),
+    )
