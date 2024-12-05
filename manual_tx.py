@@ -135,9 +135,10 @@ async def handle_manual_tx(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True,
         reply_markup=ReplyKeyboardMarkup.from_button(
-            KeyboardButton(
+            button=KeyboardButton(
                 text="Add manual transaction",
                 web_app=web_app,
-            )
+            ),
+            one_time_keyboard=True,
         ),
     )

@@ -20,6 +20,8 @@ def make_tag(t: str, title=False, tagging=True, no_emojis=False) -> str:
             .replace(".", "")
             .replace("*", "\\*")
             .replace("_", "\\_")
+            .replace("-", "\\_")
+            .replace("/", "\\_")
             .strip()
         )
 

@@ -152,11 +152,19 @@ async def send_transaction_message(
     )
 
     acct_name = (
-        transaction.plaid_account_display_name
-        or transaction.account_display_name
-        or "Unknown Account"
+        transaction.plaid_account_display_name or transaction.account_display_name
     )
-    message += f"*Account*: {make_tag(acct_name, tagging=tagging)}\n"
+
+    asset_name = ""
+    if (acct_name is None or acct_name == "") and transaction.asset_institution_name:
+        acct_name = transaction.asset_institution_name
+        asset_name = make_tag(transaction.asset_name, tagging=tagging)
+        asset_name = f" / {asset_name}"
+
+    if acct_name is None or acct_name == "":
+        acct_name = "Unknown Account"
+
+    message += f"*Account*: {make_tag(acct_name, tagging=tagging)}{asset_name}\n"
     if transaction.notes:
         message += f"*Notes*: {transaction.notes}\n"
     if transaction.tags:

@@ -45,6 +45,8 @@ async def handle_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for metric_name, values in all_metrics.items():
         total_sum = sum(float(value) for value in values.values())
+        if int(total_sum) == total_sum:
+            total_sum = int(total_sum)
         message += f"`{metric_name}` (Total: {total_sum:.4f})\n"
         for date, value in values.items():
             if int(value) == value:
@@ -58,13 +60,10 @@ async def handle_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not has_data:
         message += "No analytics data available for this week."
 
-    kbd = Keyboard()
-    kbd += ("Cancel", "cancel")
-
     await update.message.reply_text(
         text=message,
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=kbd.build(),
+        reply_markup=Keyboard.build_from(("Close", "cancel")),
     )
 
 
@@ -86,11 +85,7 @@ async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Messages sent: {sent_message_count}\n"
     )
 
-    # Add cancel button
-    kbd = Keyboard()
-    kbd += ("Cancel", "cancel")
-
     await update.message.reply_text(
         text=message,
-        reply_markup=kbd.build(),
+        reply_markup=Keyboard.build_from(("Close", "cancel")),
     )
