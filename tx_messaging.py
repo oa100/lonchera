@@ -145,6 +145,8 @@ async def send_transaction_message(
             category_group, title=True, tagging=tagging, no_emojis=True
         )
         category_group = f"{category_group} / "
+    else:
+        category_group = ""
 
     category_name = transaction.category_name or "Uncategorized"
     message += (
